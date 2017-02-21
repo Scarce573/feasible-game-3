@@ -9,9 +9,16 @@ class Renderer:
 	A renderer which uses curses to render onto a console.
 
 	Renderer.__init__(self)
+	Renderer.loop(self)
+
+	Renderer._game
 	"""
 
-	TEST = "test"
+	def __init__(self, game):
+		"""Intialize the Renderer."""
 
-	def __init__(self):
-		"""Intialize the Renderer"""
+		self._game = game
+
+	def loop(self):
+
+		pass
