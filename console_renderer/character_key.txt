@@ -1,0 +1,5 @@
+# Console Renderer ID to Character
+
+{
+"nonmob:stone": [177]
+}

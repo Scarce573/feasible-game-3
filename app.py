@@ -23,7 +23,7 @@ class App(object):
 	App._is_running
 	App._options
 	App._renderer
-	App.screen
+	App._screen
 	"""
 
 	def __init__(self):
@@ -45,11 +45,11 @@ class App(object):
 		self._renderer = Renderer(self, renderer_options)
 
 		# Start curses for I/O
-		self.screen = curses.initscr()
+		self._screen = curses.initscr()
 
 		curses.noecho()
 		curses.cbreak()
-		self.screen.keypad(1)
+		self._screen.keypad(1)
 
 	def _loop(self):
 		"""Perform a main game loop."""
@@ -59,7 +59,7 @@ class App(object):
 		self._renderer.loop()
 
 		# Get and evaluate I/O
-		key = self.screen.getch()
+		key = self._screen.getch()
 
 		if key in self._options["controls"]:
 
@@ -69,7 +69,7 @@ class App(object):
 		"""Clean up and shut down the app."""
 
 		# Shut down curses
-		self.screen.keypad(0)
+		self._screen.keypad(0)
 		curses.nocbreak()
 		curses.echo()
 		curses.endwin()
@@ -206,7 +206,7 @@ class Map(object):
 
 			for y_val in range(self._size[1]):
 
-				self._grid.append(Tile())
+				self._grid[x_val].append(Tile())
 		# *** DEBUG ***
 		pass
 

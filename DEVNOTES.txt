@@ -15,3 +15,11 @@ Curses does not support key up/down as far as I can tell
 
 Everything State._map and below defaults to something by debug
 - It's for testing renderer
+
+Console Renderer does not properly subclass anything; it is not seperated from app well enough.
+- Perhaps include a Renderer interface in App and have renderer subclass it?
+- In console_renderer.__init__.py I could rename Console_Renderer(Renderer) as just Renderer
+- That would cause a name conflict with the actual Renderer, so name it SuperRenderer
+
+Console Renderer does not respect the hiding of member variables
+- It uses App._game, Game._state, and so on.
