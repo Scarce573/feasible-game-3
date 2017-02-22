@@ -13,6 +13,7 @@ class Renderer:
 	A renderer which uses curses to render onto a console.
 
 	Renderer.__init__(self)
+	Renderer._make_map(self)
 	Renderer.loop(self)
 
 	Renderer._app
@@ -32,24 +33,41 @@ class Renderer:
 		self._character_key = eval(character_key_file.read())
 		character_key_file.close()
 
-	def loop(self):
-
-		# Get map
-		game_map = self._app._game._state._map
+	def _make_map(self, game_map):
 
 		# Make a pad for map
-		map_pad = curses.newpad(game_map._size[0], game_map._size[1])
+		map_pad = curses.newpad(game_map._size[1], game_map._size[0])
+		
+		# Construct the map pad
+		for y_val in range(0, game_map._size[1]):
+		    for x_val in range(0, game_map._size[0]):
 
-		# Iterate and evaluate the character
-		for x_val in range(game_map._size[0]):
-			for y_val in range(game_map._size[1]):
+			tile_to_render = game_map._grid[x_val][y_val]
 
-				tile_to_render = game_map._grid[x_val][y_val]
+			# *** DEBUG ***
+			entity_to_render = tile_to_render._layers[0][0]
+                        # *** DEBUG ***
 
-                                # *** DEBUG ***
-				entity_to_render = tile_to_render._layers[0][0]
-                                # *** DEBUG ***
+			ch = self._character_key[entity_to_render.id][0]
 
-				ch = self._character_key[entity_to_render.id][0]
-                                print ch
-				map_pad.addch(y_val, x_val, ch)
+			try:
+
+			    map_pad.addch(y_val, x_val, ch)
+
+			except curses.error:
+
+			    pass
+
+		# Return the map pad
+		return map_pad
+
+	def loop(self):
+
+		# Load information
+		game_map = self._app._game._state._map
+
+		# Get pads
+		map_pad = self._make_map(game_map)
+
+		# Print pads to scren
+		map_pad.refresh(0, 0, 0, 0, game_map._size[1], game_map._size[0])

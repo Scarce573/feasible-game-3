@@ -49,6 +49,7 @@ class App(object):
 
 		curses.noecho()
 		curses.cbreak()
+		self._screen.nodelay(1)
 		self._screen.keypad(1)
 
 	def _loop(self):
@@ -61,7 +62,7 @@ class App(object):
 		# Get and evaluate I/O
 		key = self._screen.getch()
 
-		if key in self._options["controls"]:
+		if key in self._options["controls"] and key != curses.ERR:
 
 			self._game.eval_control_string(self._options["controls"][key])
 
@@ -70,6 +71,7 @@ class App(object):
 
 		# Shut down curses
 		self._screen.keypad(0)
+		self._screen.nodelay(0)
 		curses.nocbreak()
 		curses.echo()
 		curses.endwin()
@@ -198,7 +200,7 @@ class Map(object):
 
 		# *** DEBUG ***
 		self._grid = []
-		self._size = (32, 32)
+		self._size = (48, 16)
 
 		for x_val in range(self._size[0]):
 
