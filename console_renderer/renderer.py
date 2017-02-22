@@ -11,13 +11,16 @@ class Renderer:
 	Renderer.__init__(self)
 	Renderer.loop(self)
 
-	Renderer._game
+	Renderer._app
+	Renderer._options
 	"""
 
-	def __init__(self, game):
+	def __init__(self, app, options):
 		"""Intialize the Renderer."""
 
-		self._game = game
+		# Initialize variables
+		self._app = app
+		self._options = options
 
 	def loop(self):
 

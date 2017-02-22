@@ -1,0 +1,12 @@
+# Game options
+
+{
+"controls": {
+	ord('w'): "move_north", 
+	ord('a'): "move_west",
+	ord('s'): "move_south",
+	ord('d'): "move_east",
+
+	ord('p'): "pause",
+	},
+}
