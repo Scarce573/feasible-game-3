@@ -4,8 +4,16 @@
 
 # Imports
 import curses
+import json
 import os
 from console_renderer import Renderer
+
+from mirec_miskuf_json import *
+
+# Constants
+VIEW_MAP = 0
+
+DEFAULT_INDEX = [VIEW_MAP]
 
 # Classes
 
@@ -30,12 +38,12 @@ class App(object):
 		"""Intialize App, starting the game."""
 
 		# Load options
-		game_options_file = open("options.txt", 'r')
-		self._options = eval(game_options_file.read())
+		game_options_file = open("options.json", 'r')
+		self._options = json_loads_str(game_options_file.read())
 		game_options_file.close()
 
-		renderer_options_file = open(os.path.join("console_renderer", "options.txt"), 'r')
-		renderer_options = eval(renderer_options_file.read())
+		renderer_options_file = open(os.path.join("console_renderer", "options.json"), 'r')
+		renderer_options = json_loads_str(renderer_options_file.read())
 		renderer_options_file.close()
 
 		# Initialize variables
@@ -62,9 +70,9 @@ class App(object):
 		# Get and evaluate I/O
 		key = self._screen.getch()
 
-		if key in self._options["controls"] and key != curses.ERR:
+		if str(key) in self._options["controls"] and key != curses.ERR:
 
-			self._game.eval_control_string(self._options["controls"][key])
+			self._game.eval_control_string(self._options["controls"][str(key)])
 
 	def _quit(self):
 		"""Clean up and shut down the app."""
@@ -208,7 +216,7 @@ class Map(object):
 
 			for y_val in range(self._size[1]):
 
-				self._grid[x_val].append(Tile())
+				self._grid[x_val].append(Tile({"layers": [{"0": ["nonmob", {"permeability": 0, "id": "default:nonmob:grass"}]}, {"1": ["nonmob", {"permeability": 1, "id": "default:mob:player"}]}]}))
 		# *** DEBUG ***
 		pass
 
@@ -221,41 +229,119 @@ class Tile(object):
 	Tile._layers
 	"""
 
-	def __init__(self):
+	"""def __init__(self):
 
-		# *** DEBUG ***
-		self._layers = [[NonMob()]]
-		# *** DEBUG ***
-		pass
+		self._layers = []"""
+
+	def __init__(self, saved_state):
+		"""Load the Tile from a saved state."""
+
+		# Reconstruct layers and entites
+		self._layers = []
+		layers_list = saved_state["layers"]
+
+		for layer_dict in layers_list:
+
+			layer = {}
+
+			for key in layer_dict:
+
+				if layer_dict[key][0] == "mob":
+
+					layer[key] = Mob(layer_dict[key][1])
+
+				elif layer_dict[key][0] == "nonmob":
+
+					layer[key] = NonMob(layer_dict[key][1])
+
+			self._layers.append(layer)
+		
+	def __str__(self):
+		"""Create a string representation used for saving."""
+
+		layers_list = []
+
+		# Iterate though layers
+		for layer in self._layers:
+
+			layer_dict = {}
+
+			for key in layer:
+				# Check if it's a Mob or NonMob
+				if type(layer[key]) == Mob:
+
+					layer_dict[key] = ["mob", json_loads_str(str(layer[key]))]
+
+				elif type(layer[key]) == NonMob:
+
+					layer_dict[key] = ["nonmob", json_loads_str(str(layer[key]))]
+
+			layers_list.append(layer_dict)
+
+		# Construct the state and return
+		state = {"layers": layers_list}
+
+		return json.dumps(state)
+		
 
 class Entity(object):
 	"""
 	An entity, what is occupying a tile
 
-	Entity.__init__(self)
+	Entity.__init__(self, saved_state)
+	Entity.__str__(self)
 
 	Entity.id
+	Entity.permeability
 	"""
 
-	def __init__(self):
+	def __init__(self, saved_state):
+		"""Load the Entity from a saved state dict."""
 
-		self.id = None
+		# Reconstruct
+		self.id = saved_state["id"]
+		self.permeability = saved_state["permeability"]
+
+	def __str__(self):
+		"""Create a string representation used for saving."""
+
+		state = {"id": self.id, "permeability": self.permeability}
+
+		return json.dumps(state)
 
 class NonMob(Entity):
 	"""
 	An entity wihout an AI
 
-	NonMob.__init__(self)
+	NonMob.__init__(self, saved_state)
 
 	Also includes some member variables from Entity
 	"""
 
-	def __init__(self):
+	def __init__(self, saved_state):
+		"""Create a NonMob from a saved state."""
 
-		super(NonMob, self).__init__()
-		# *** DEBUG ***
-		self.id = "nonmob:stone"
-		# *** DEBUG ***
+		super(NonMob, self).__init__(saved_state)
+
+class Mob(Entity):
+	"""
+	An entity with an AI
+
+	Mob.__init__(self, saved_state)
+
+	Also includes some member variables from Entity
+	"""
+
+	def __init__(self, saved_state):
+		"""Create a Mob from a saved state."""
+
+		super(Mob, self).__init__(saved_state)
+
+# Functions
+
+def directory_from_id(id_):
+
+        return os.path.join(id_.split(':'))
 
 # Main
 

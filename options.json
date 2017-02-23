@@ -1,0 +1,11 @@
+{
+"controls":	
+	{
+		"112": "pause", 
+
+		"119": "move_north",
+		"97": "move_west", 
+		"115": "move_south", 
+		"100": "move_east"
+	}
+}

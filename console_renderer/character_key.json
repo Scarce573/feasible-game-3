@@ -1,0 +1,5 @@
+{
+	"default:nonmob:stone": [35],
+	"default:nonmob:grass": [44],
+	"default:mob:player": [64]
+}

@@ -1,4 +1,0 @@
-# Console Renderer Options
-
-{
-}

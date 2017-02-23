@@ -5,6 +5,7 @@
 # Modules
 import curses
 import os
+from mirec_miskuf_json import *
 
 # Classes
 
@@ -29,8 +30,8 @@ class Renderer:
 		self._options = options
 
 		# Get id to character dict
-		character_key_file = open(os.path.join("console_renderer", "character_key.txt"), 'r')
-		self._character_key = eval(character_key_file.read())
+		character_key_file = open(os.path.join("console_renderer", "character_key.json"), 'r')
+		self._character_key = json_loads_str(character_key_file.read())
 		character_key_file.close()
 
 	def _make_map(self, game_map):
@@ -45,7 +46,8 @@ class Renderer:
 			tile_to_render = game_map._grid[x_val][y_val]
 
 			# *** DEBUG ***
-			entity_to_render = tile_to_render._layers[0][0]
+			perm = min(tile_to_render._layers[-1].keys())
+			entity_to_render = tile_to_render._layers[-1][perm]
                         # *** DEBUG ***
 
 			ch = self._character_key[entity_to_render.id][0]
