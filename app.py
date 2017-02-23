@@ -204,19 +204,44 @@ class Map(object):
 	Map._size
 	"""
 
-	def __init__(self):
-
+	def __init__(self, debug = True): # DEBUG
+                
 		# *** DEBUG ***
-		self._grid = []
-		self._size = (48, 16)
+                if debug:
 
-		for x_val in range(self._size[0]):
+                        player_tile_json = {"layers": [{"0": ["nonmob", {"permeability": 0, "id": "default:nonmob:grass"}]}, {"1": ["mob", {"permeability": 1, "id": "default:mob:player"}]}]}
+                        grass_tile_json = {"layers": [{"0": ["nonmob", {"permeability": 0, "id": "default:nonmob:grass"}]}]}
+                        stone_tile_json = {"layers": [{"0": ["nonmob", {"permeability": 0, "id": "default:nonmob:stone"}]}, {"0": ["nonmob", {"permeability": 0, "id": "default:nonmob:stone"}]}]}
+                        
+                        self._grid = []
+                        self._size = (48, 16)
 
-			self._grid.append([])
+                        for x_val in range(self._size[0]):
 
-			for y_val in range(self._size[1]):
+                                self._grid.append([])
 
-				self._grid[x_val].append(Tile({"layers": [{"0": ["nonmob", {"permeability": 0, "id": "default:nonmob:grass"}]}, {"1": ["nonmob", {"permeability": 1, "id": "default:mob:player"}]}]}))
+                                for y_val in range(self._size[1]):
+
+                                        data = None
+
+                                        if x_val == 0 or x_val == 47 or y_val == 0 or y_val == 15:
+
+                                                data = stone_tile_json
+
+                                        elif x_val == 4 and y_val == 4:
+
+                                                data = stone_tile_json
+
+                                        elif x_val == 8 and y_val == 8:
+
+                                                data = player_tile_json
+
+                                        else:
+
+                                                data = grass_tile_json
+                                        
+                                        tile = Tile(data)
+                                        self._grid[x_val].append(tile)
 		# *** DEBUG ***
 		pass
 
@@ -224,7 +249,7 @@ class Tile(object):
 	"""
 	A tile on the map, potentially containing many entities
 
-	Tile.__init__(self)
+	Tile.__init__(self, saved_state)
 
 	Tile._layers
 	"""
@@ -248,11 +273,11 @@ class Tile(object):
 
 				if layer_dict[key][0] == "mob":
 
-					layer[key] = Mob(layer_dict[key][1])
+					layer[int(key)] = Mob(layer_dict[key][1])
 
 				elif layer_dict[key][0] == "nonmob":
 
-					layer[key] = NonMob(layer_dict[key][1])
+					layer[int(key)] = NonMob(layer_dict[key][1])
 
 			self._layers.append(layer)
 		
