@@ -12,8 +12,7 @@ from mirec_miskuf_json import *
 
 # Constants
 VIEW_MAP = 0
-
-DEFAULT_INDEX = [VIEW_MAP]
+VIEW_DC = 1
 
 # Classes
 
@@ -130,7 +129,11 @@ class Game(object):
 					"move_south": self._io_move_south,
 					"move_east": self._io_move_east,
 					"pause": self._io_pause}
-		self._state = State()
+		self._state = None
+		# *** DEBUG ***
+		f = open("debug/state.json", 'r')
+		self._state = State(json_loads_str(f.read()))
+		# *** DEUBG ***
 
 		pass
 
@@ -185,84 +188,108 @@ class State(object):
 	"""
 	The class which contains all the in-game information necessary to take a snapshot
 
-	State.__init__(self)
+	State.__init__(self, saved_state)
+	State.__str__(self)
 
 	State._map
+	State.index
 	"""
 
-	def __init__(self):
+	def __init__(self, saved_state):
+		"""Initialize the State from a save."""
 
-		self._map = Map()
+		# Load from the saved state
+		self._map = Map(saved_state["map"])
+		
+		# Load index
+		self.index = saved_state["index"]
+
+		if self.index[0] == VIEW_MAP or self.index[0] == VIEW_DC:
+
+			mob_loc = self.index[1][0]
+			mob_layer = self.index[1][1]
+			mob_permeability = self.index[1][2]
+
+			tile = self._map.grid[mob_loc[0]][mob_loc[1]]
+			layer = tile.layers[mob_layer]
+			mob = layer[mob_permeability]
+
+			self.index[1] = mob
+
+	def __str__(self):
+		"""Create a string representation used for saving."""
+
+		# Construct the state and return
+		state = {"map": json_loads_str(str(self._map))}
+
+		return json.dumps(state)
 
 class Map(object):
 	"""
 	The class which contains a grid of tiles
 
-	Map.__init__(self)
+	Map.__init__(self, saved_state)
+	Map.__str__(self)
 
-	Map._grid
 	Map._size
+	Map.grid
 	"""
 
-	def __init__(self, debug = True): # DEBUG
-                
-		# *** DEBUG ***
-                if debug:
+	def __init__(self, saved_state):
+		"""Initialize the Map from a saved state."""
 
-                        player_tile_json = {"layers": [{"0": ["nonmob", {"permeability": 0, "id": "default:nonmob:grass"}]}, {"1": ["mob", {"permeability": 1, "id": "default:mob:player"}]}]}
-                        grass_tile_json = {"layers": [{"0": ["nonmob", {"permeability": 0, "id": "default:nonmob:grass"}]}]}
-                        stone_tile_json = {"layers": [{"0": ["nonmob", {"permeability": 0, "id": "default:nonmob:stone"}]}, {"0": ["nonmob", {"permeability": 0, "id": "default:nonmob:stone"}]}]}
-                        
-                        self._grid = []
-                        self._size = (48, 16)
+		# Load from the saved state
+		self._size = tuple(saved_state["size"])
 
-                        for x_val in range(self._size[0]):
+		# Load the grid
+		self.grid = []
 
-                                self._grid.append([])
+		for saved_col in saved_state["grid"]:
 
-                                for y_val in range(self._size[1]):
+			col = []
 
-                                        data = None
+			for saved_tile in saved_col:
 
-                                        if x_val == 0 or x_val == 47 or y_val == 0 or y_val == 15:
+				col.append(Tile(saved_tile))
 
-                                                data = stone_tile_json
+			self.grid.append(col)
 
-                                        elif x_val == 4 and y_val == 4:
+	def __str__(self):
+		"""Create a string representation used for saving."""
 
-                                                data = stone_tile_json
+		# Fix grid
+		saved_grid = []
 
-                                        elif x_val == 8 and y_val == 8:
+		for col in self.grid:
 
-                                                data = player_tile_json
+			saved_col = []
 
-                                        else:
+			for tile in col:
 
-                                                data = grass_tile_json
-                                        
-                                        tile = Tile(data)
-                                        self._grid[x_val].append(tile)
-		# *** DEBUG ***
-		pass
+				saved_col.append(json_loads_str(str(tile)))
+
+			saved_grid.append(saved_col)
+
+		# Construct the state and return
+		state = {"size": self._size, "grid": saved_grid}
+
+		return json.dumps(state)
 
 class Tile(object):
 	"""
 	A tile on the map, potentially containing many entities
 
 	Tile.__init__(self, saved_state)
+	Tile.__str__(self)
 
-	Tile._layers
+	Tile.layers
 	"""
-
-	"""def __init__(self):
-
-		self._layers = []"""
 
 	def __init__(self, saved_state):
 		"""Load the Tile from a saved state."""
 
 		# Reconstruct layers and entites
-		self._layers = []
+		self.layers = []
 		layers_list = saved_state["layers"]
 
 		for layer_dict in layers_list:
@@ -279,15 +306,15 @@ class Tile(object):
 
 					layer[int(key)] = NonMob(layer_dict[key][1])
 
-			self._layers.append(layer)
+			self.layers.append(layer)
 		
 	def __str__(self):
 		"""Create a string representation used for saving."""
 
+		# Fix layers
 		layers_list = []
 
-		# Iterate though layers
-		for layer in self._layers:
+		for layer in self.layers:
 
 			layer_dict = {}
 
@@ -366,7 +393,7 @@ class Mob(Entity):
 
 def directory_from_id(id_):
 
-        return os.path.join(id_.split(':'))
+	return os.path.join(id_.split(':'))
 
 # Main
 

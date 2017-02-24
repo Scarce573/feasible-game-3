@@ -43,11 +43,11 @@ class Renderer:
 		for y_val in range(0, game_map._size[1]):
 		    for x_val in range(0, game_map._size[0]):
 
-			tile_to_render = game_map._grid[x_val][y_val]
+			tile_to_render = game_map.grid[x_val][y_val]
 
 			# *** DEBUG ***
-			perm = min(tile_to_render._layers[-1].keys())
-			entity_to_render = tile_to_render._layers[-1][perm]
+			perm = min(tile_to_render.layers[-1].keys())
+			entity_to_render = tile_to_render.layers[-1][perm]
                         # *** DEBUG ***
 
 			ch = self._character_key[entity_to_render.id][0]
