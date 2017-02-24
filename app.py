@@ -3,6 +3,7 @@
 # Version 0.1
 
 # Imports
+import copy
 import curses
 import json
 import os
@@ -105,6 +106,8 @@ class Game(object):
 	"""
 	The class which controls the game, doing modifications on the game state
 
+	The Game._io_* namespace is used for various control inputs.
+
 	Game.__init__(self, app, options)
 	Game._io_move_north(self)
 	Game._io_move_west(self)
@@ -204,13 +207,14 @@ class State(object):
 		# Load index
 		self.index = saved_state["index"]
 
-		if self.index[0] == VIEW_MAP or self.index[0] == VIEW_DC:
+		if saved_state["index"][0] == VIEW_MAP or saved_state["index"][0] == VIEW_DC:
 
-			mob_loc = self.index[1][0]
-			mob_layer = self.index[1][1]
-			mob_permeability = self.index[1][2]
+			mob_loc_x = saved_state["index"][1][0][0]
+			mob_loc_y = saved_state["index"][1][0][1]
+			mob_layer = saved_state["index"][1][0][2]
+			mob_permeability = saved_state["index"][1][1]
 
-			tile = self._map.grid[mob_loc[0]][mob_loc[1]]
+			tile = self._map.grid[mob_loc_x][mob_loc_y]
 			layer = tile.layers[mob_layer]
 			mob = layer[mob_permeability]
 
@@ -219,8 +223,15 @@ class State(object):
 	def __str__(self):
 		"""Create a string representation used for saving."""
 
+		# Check if index[1] is a mob and then fix it if necessary
+		if type(self.index[1]) == Mob:
+
+			saved_index = copy.copy(self.index)
+
+			saved_index[1] = [self.index[1].coords, self.index[1].permeability]
+
 		# Construct the state and return
-		state = {"map": json_loads_str(str(self._map))}
+		state = {"map": json_loads_str(str(self._map)), "index": saved_index}
 
 		return json.dumps(state)
 
@@ -244,13 +255,15 @@ class Map(object):
 		# Load the grid
 		self.grid = []
 
-		for saved_col in saved_state["grid"]:
+		for x_val in range(len(saved_state["grid"])):
 
+			saved_col = saved_state["grid"][x_val]
 			col = []
 
-			for saved_tile in saved_col:
+			for y_val in range(len(saved_col)):
 
-				col.append(Tile(saved_tile))
+				saved_tile = saved_state["grid"][x_val][y_val]
+				col.append(Tile(saved_tile, [x_val, y_val]))
 
 			self.grid.append(col)
 
@@ -279,14 +292,18 @@ class Tile(object):
 	"""
 	A tile on the map, potentially containing many entities
 
-	Tile.__init__(self, saved_state)
+	Tile.__init__(self, saved_state, coords)
 	Tile.__str__(self)
 
+	Tile.coords
 	Tile.layers
 	"""
 
-	def __init__(self, saved_state):
+	def __init__(self, saved_state, coords):
 		"""Load the Tile from a saved state."""
+
+		# Set coords
+		self.coords = coords
 
 		# Reconstruct layers and entites
 		self.layers = []
@@ -298,18 +315,25 @@ class Tile(object):
 
 			for key in layer_dict:
 
+				entity_coords = copy.copy(coords)
+				entity_coords.append(int(key))
+
 				if layer_dict[key][0] == "mob":
 
-					layer[int(key)] = Mob(layer_dict[key][1])
+					layer[int(key)] = Mob(layer_dict[key][1], entity_coords)
 
 				elif layer_dict[key][0] == "nonmob":
 
-					layer[int(key)] = NonMob(layer_dict[key][1])
+					layer[int(key)] = NonMob(layer_dict[key][1], entity_coords)
 
 			self.layers.append(layer)
 		
 	def __str__(self):
-		"""Create a string representation used for saving."""
+		"""
+		Create a string representation used for saving.
+
+		self.coords is not saved because it is a soft reference.
+		"""
 
 		# Fix layers
 		layers_list = []
@@ -340,22 +364,28 @@ class Entity(object):
 	"""
 	An entity, what is occupying a tile
 
-	Entity.__init__(self, saved_state)
+	Entity.__init__(self, saved_state, coords)
 	Entity.__str__(self)
 
+	Entity.coords
 	Entity.id
 	Entity.permeability
 	"""
 
-	def __init__(self, saved_state):
+	def __init__(self, saved_state, coords):
 		"""Load the Entity from a saved state dict."""
 
 		# Reconstruct
+		self.coords = coords
 		self.id = saved_state["id"]
 		self.permeability = saved_state["permeability"]
 
 	def __str__(self):
-		"""Create a string representation used for saving."""
+		"""
+		Create a string representation used for saving.
+
+		self.coords is a soft reference, so it is not saved.
+		"""
 
 		state = {"id": self.id, "permeability": self.permeability}
 
@@ -365,29 +395,29 @@ class NonMob(Entity):
 	"""
 	An entity wihout an AI
 
-	NonMob.__init__(self, saved_state)
+	NonMob.__init__(self, saved_state, coords)
 
 	Also includes some member variables from Entity
 	"""
 
-	def __init__(self, saved_state):
+	def __init__(self, saved_state, coords):
 		"""Create a NonMob from a saved state."""
 
-		super(NonMob, self).__init__(saved_state)
+		super(NonMob, self).__init__(saved_state, coords)
 
 class Mob(Entity):
 	"""
 	An entity with an AI
 
-	Mob.__init__(self, saved_state)
+	Mob.__init__(self, saved_state, coords)
 
 	Also includes some member variables from Entity
 	"""
 
-	def __init__(self, saved_state):
+	def __init__(self, saved_state, coords):
 		"""Create a Mob from a saved state."""
 
-		super(Mob, self).__init__(saved_state)
+		super(Mob, self).__init__(saved_state, coords)
 
 # Functions
 
@@ -397,5 +427,5 @@ def directory_from_id(id_):
 
 # Main
 
-app = App()
-app.start()
+#app = App()
+#app.start()
