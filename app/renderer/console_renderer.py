@@ -5,11 +5,11 @@
 # Modules
 import curses
 import os
-from mirec_miskuf_json import *
+from mirec_miskuf_json import json_loads_str
 
 # Classes
 
-class Renderer:
+class Renderer(object):
 	"""
 	A renderer which uses curses to render onto a console.
 
@@ -30,7 +30,9 @@ class Renderer:
 		self._options = options
 
 		# Get id to character dict
-		character_key_file = open(os.path.join("console_renderer", "character_key.json"), 'r')
+		character_key_path = os.path.join(	os.path.dirname(__file__), 
+							"character_key.json")
+		character_key_file = open(character_key_path, 'r')
 		self._character_key = json_loads_str(character_key_file.read())
 		character_key_file.close()
 

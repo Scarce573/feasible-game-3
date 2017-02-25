@@ -7,9 +7,10 @@ import copy
 import curses
 import json
 import os
-from console_renderer import Renderer
 
-from mirec_miskuf_json import *
+from mirec_miskuf_json import json_loads_str
+
+from renderer import Renderer
 
 # Constants
 VIEW_MAP = 0
@@ -37,12 +38,17 @@ class App(object):
 	def __init__(self):
 		"""Intialize App, starting the game."""
 
-		# Load options
-		game_options_file = open("options.json", 'r')
+		# Load game options
+		game_options_path = os.path.join(	os.path.dirname(__file__), 
+							"options.json")
+		game_options_file = open(game_options_path, 'r')
 		self._options = json_loads_str(game_options_file.read())
 		game_options_file.close()
 
-		renderer_options_file = open(os.path.join("console_renderer", "options.json"), 'r')
+		# Load renderer options
+		renderer_options_path = os.path.join(	os.path.dirname(__file__), 								"renderer",
+							"options.json")
+		renderer_options_file = open(renderer_options_path, 'r')
 		renderer_options = json_loads_str(renderer_options_file.read())
 		renderer_options_file.close()
 
@@ -136,7 +142,9 @@ class Game(object):
 					"pause": self._io_pause}
 		self._state = None
 		# *** DEBUG ***
-		f = open("debug/state.json", 'r')
+		path = os.path.join(	os.path.dirname(__file__), 
+					"debug/state.json")
+		f = open(path, 'r')
 		self._state = State(json_loads_str(f.read()))
 		# *** DEUBG ***
 
@@ -477,8 +485,3 @@ class Mob(Entity):
 def directory_from_id(id_):
 
 	return os.path.join(id_.split(':'))
-
-# Main
-
-app = App()
-app.start()
