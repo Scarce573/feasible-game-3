@@ -107,6 +107,7 @@ class Game(object):
 	The class which controls the game, doing modifications on the game state
 
 	The Game._io_* namespace is used for various control inputs.
+	The Game._mod_* namespace is used for modifying state (__init__ does it also)
 
 	Game.__init__(self, app, options)
 	Game._io_move_north(self)
@@ -114,6 +115,7 @@ class Game(object):
 	Game._io_move_south(self)
 	Game._io_move_east(self)
 	Game._io_pause(self)
+	Game._mod_move(self, mob, to_coords)
 	Game.eval_control_string(self, string)
 	Game.loop(self)
 
@@ -177,6 +179,55 @@ class Game(object):
 
 		self._app.stop()
 
+	def _mod_move(self, entity, to_coords):
+		"""
+		Attempt to move entity to specified coordinates.
+
+		This is the only method allowed to move entities
+		It specifies entity to prevent referencing empty coordinates.
+		It also changes entity.coords
+		It also expands tile if necessary
+		You might want to copy.copy(...) to_coords before using this.
+		"""
+		
+		# Get the from and to loactions
+		from_layers = self._state.map.grid[entity.coords[0]][entity.coords[1]].layers
+		to_layers = self._state.map.grid[to_coords[0]][to_coords[1]].layers
+
+		try:
+			if min(to_layers[to_coords[2]].keys()) <= entity.permeability:
+
+				# A collision has occurred
+				return
+
+		except IndexError:
+
+			# Entity is moving to a vaccuum above the defined layers
+			pass
+
+		except ValueError:
+
+			# Entity is moving into a vaccuum under some defined layer
+			pass
+
+		# Remove the entity
+		del from_layers[entity.coords[2]][entity.permeability]
+		
+		# Clean up; this would add the default tile (?) if that were implemented
+		while from_layers[-1] == {} and len(from_layers) != 0:
+
+			del from_layers[-1]
+
+		# Put the entity at the new location, extending with default tile (!) if necessary
+		while len(to_layers) <= to_coords[2]:
+
+			to_layers.append({})
+
+		to_layers[to_coords[2]][entity.permeability] = entity
+
+		# Fix entity.coords
+		entity.coords = to_coords
+
 	def eval_control_string(self, string):
 		"""Evaluate a control string, mapping it to a Game._io_* function."""
 
@@ -194,7 +245,7 @@ class State(object):
 	State.__init__(self, saved_state)
 	State.__str__(self)
 
-	State._map
+	State.map
 	State.index
 	"""
 
@@ -202,7 +253,7 @@ class State(object):
 		"""Initialize the State from a save."""
 
 		# Load from the saved state
-		self._map = Map(saved_state["map"])
+		self.map = Map(saved_state["map"])
 		
 		# Load index
 		self.index = saved_state["index"]
@@ -214,7 +265,7 @@ class State(object):
 			mob_layer = saved_state["index"][1][0][2]
 			mob_permeability = saved_state["index"][1][1]
 
-			tile = self._map.grid[mob_loc_x][mob_loc_y]
+			tile = self.map.grid[mob_loc_x][mob_loc_y]
 			layer = tile.layers[mob_layer]
 			mob = layer[mob_permeability]
 
@@ -231,7 +282,7 @@ class State(object):
 			saved_index[1] = [self.index[1].coords, self.index[1].permeability]
 
 		# Construct the state and return
-		state = {"map": json_loads_str(str(self._map)), "index": saved_index}
+		state = {"map": json_loads_str(str(self.map)), "index": saved_index}
 
 		return json.dumps(state)
 
@@ -364,6 +415,8 @@ class Entity(object):
 	"""
 	An entity, what is occupying a tile
 
+	Higher permeability means it's more similar to a vaccuum.
+
 	Entity.__init__(self, saved_state, coords)
 	Entity.__str__(self)
 
@@ -427,5 +480,5 @@ def directory_from_id(id_):
 
 # Main
 
-#app = App()
-#app.start()
+app = App()
+app.start()

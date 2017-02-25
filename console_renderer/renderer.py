@@ -66,7 +66,7 @@ class Renderer:
 	def loop(self):
 
 		# Load information
-		game_map = self._app._game._state._map
+		game_map = self._app._game._state.map
 
 		# Get pads
 		map_pad = self._make_map(game_map)
