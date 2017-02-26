@@ -4,4 +4,6 @@
 
 # __init__.py for the module default.ai, the AIs of the default datapack for Feasible Game 3
 
-from player import PlayerAI
+import player
+
+__all__ = ["player"]

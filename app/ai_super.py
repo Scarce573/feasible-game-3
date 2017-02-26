@@ -4,9 +4,11 @@ class AI(object):
 
 	This class is not for instantiation
 
-	AI.get_next_move(self, mob)
+	AI.get_next_turn(self, mob)
 	"""
 
-	def get_next_move(self, mob):
+	@staticmethod
+	def get_next_turn(mob):
+		"""Get the next action of the mob."""
 
 		return None

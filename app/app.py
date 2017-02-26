@@ -11,8 +11,33 @@ import os
 from mirec_miskuf_json import json_loads_str
 
 from renderer import Renderer
+import default.ai
+
+ai = {}
+
+for var in default.ai.__all__:
+
+	ai[var] = vars(default.ai)[var]
 
 # Constants
+DIR_NORTH = 0
+DIR_NORTHEAST = 1
+DIR_EAST = 2
+DIR_SOUTHEAST = 3
+DIR_SOUTH = 4
+DIR_SOUTHWEST = 5
+DIR_WEST = 6
+DIR_NORTHWEST = 7
+
+DIR_OFFSETS = { DIR_NORTH: (0, -1),
+                DIR_NORTHEAST: (1, -1),
+                DIR_EAST: (1, 0),
+                DIR_SOUTHEAST: (1, 1),
+                DIR_SOUTH: (0, 1),
+                DIR_SOUTHWEST: (-1, 1),
+                DIR_WEST: (-1, 0),
+                DIR_NORTHWEST: (-1, -1)}
+
 VIEW_MAP = 0
 VIEW_DC = 1
 
@@ -39,14 +64,14 @@ class App(object):
 		"""Intialize App, starting the game."""
 
 		# Load game options
-		game_options_path = os.path.join(	os.path.dirname(__file__), 
+		game_options_path = os.path.join(       os.path.dirname(__file__), 
 							"options.json")
 		game_options_file = open(game_options_path, 'r')
 		self._options = json_loads_str(game_options_file.read())
 		game_options_file.close()
 
 		# Load renderer options
-		renderer_options_path = os.path.join(	os.path.dirname(__file__), 								"renderer",
+		renderer_options_path = os.path.join(   os.path.dirname(__file__),                                                              "renderer",
 							"options.json")
 		renderer_options_file = open(renderer_options_path, 'r')
 		renderer_options = json_loads_str(renderer_options_file.read())
@@ -112,16 +137,20 @@ class Game(object):
 	"""
 	The class which controls the game, doing modifications on the game state
 
+        The Game._act_* namespace is the collection of methods that actions should call.
 	The Game._io_* namespace is used for various control inputs.
 	The Game._mod_* namespace is used for modifying state (__init__ does it also)
 
 	Game.__init__(self, app, options)
+        Game._act_move(self, mob, direction)
+        Game._do_action(self, mob, action)
 	Game._io_move_north(self)
 	Game._io_move_west(self)
 	Game._io_move_south(self)
 	Game._io_move_east(self)
 	Game._io_pause(self)
 	Game._mod_move(self, mob, to_coords)
+	Game._turn(self)
 	Game.eval_control_string(self, string)
 	Game.loop(self)
 
@@ -135,57 +164,78 @@ class Game(object):
 
 		# Initialize variables
 		self._app = app
-		self._controls = {	"move_north": self._io_move_north,
+		self._controls = {      "move_north": self._io_move_north,
 					"move_west": self._io_move_west,
 					"move_south": self._io_move_south,
 					"move_east": self._io_move_east,
 					"pause": self._io_pause}
 		self._state = None
 		# *** DEBUG ***
-		path = os.path.join(	os.path.dirname(__file__), 
-					"debug/state.json")
+		path = os.path.join(    os.path.dirname(__file__), 
+					"debug/state3.json")
 		f = open(path, 'r')
 		self._state = State(json_loads_str(f.read()))
 		# *** DEUBG ***
-
 		pass
+
+        def _act_move(self, mob, direction):
+                """
+                Moves the mob 1 unit in direction so that the mob can collide.
+
+                Perhaps this method should return something if there's a failure so action can react?
+                """
+
+                # Calculate the to_coords
+                offset = DIR_OFFSETS[direction]
+                to_coords = (mob.coords[0] + offset[0], mob.coords[1] + offset[1], mob.coords[2])
+
+                # Execute the movement
+                self._mod_move(mob, to_coords)
+
+        def _do_action(self, mob, action):
+                """Change state based on which action is performed by what mob."""
+
+                # *** DEBUG ***
+                path = os.path.join(os.path.dirname(__file__), *action.split(':'))
+                action_file = open(path, 'r')
+                exec(action_file.read())
+                # *** DEBUG ***
+                pass
 
 	def _io_move_north(self):
-		"""Move the player character north."""
+		"""Prepare to move the player character north."""
 		
-		# *** DEBUG ***
-		print "north"
-		# *** DEBUG ***
-		pass
+		player = self._state.index[1]
+		ai_type = player.ai.split(":")[-1]
+		player.next_turn = ai[ai_type].DefAI.get_move(player, DIR_NORTH)
 
 	def _io_move_west(self):
-		"""Move the player character west."""
+		"""Prepare to move the player character west."""
 
-		# *** DEBUG ***
-		print "west"
-		# *** DEBUG ***
-		pass
+		player = self._state.index[1]
+		ai_type = player.ai.split(":")[-1]
+		player.next_turn = ai[ai_type].DefAI.get_move(player, DIR_WEST)
 
 	def _io_move_south(self):
-		"""Move the player character south."""
+		"""Prepare to move the player character south."""
 
-		# *** DEBUG ***
-		print "south"
-		# *** DEBUG ***
-		pass
+		player = self._state.index[1]
+		ai_type = player.ai.split(":")[-1]
+		player.next_turn = ai[ai_type].DefAI.get_move(player, DIR_SOUTH)
 
 	def _io_move_east(self):
-		"""Move the player character east."""
+		"""Prepare to move the player character east."""
 
-		# *** DEBUG ***
-		print "east"
-		# *** DEBUG ***
-		pass
+		player = self._state.index[1]
+		ai_type = player.ai.split(":")[-1]
+		player.next_turn = ai[ai_type].DefAI.get_move(player, DIR_EAST)
 
 	def _io_pause(self):
 		"""Quit the game."""
 
+                # *** DEBUG ***
 		self._app.stop()
+                # *** DEBUG ***
 
 	def _mod_move(self, entity, to_coords):
 		"""
@@ -236,6 +286,20 @@ class Game(object):
 		# Fix entity.coords
 		entity.coords = to_coords
 
+        def _turn(self):
+                """Execute the actions of a turn"""
+
+                # Execute all of the actions
+                for mob in self._state.map.get_mobs():
+
+                        self._do_action(mob, mob.next_turn)
+
+                # Reset/decide the actions for all the next turns
+                for mob in self._state.map.get_mobs():
+
+                        ai_type = mob.ai.split(":")[-1]
+                        mob.next_turn = ai[ai_type].DefAI.get_next_turn(mob)
+
 	def eval_control_string(self, string):
 		"""Evaluate a control string, mapping it to a Game._io_* function."""
 
@@ -244,7 +308,16 @@ class Game(object):
 	def loop(self):
 		"""Perform a main game loop."""
 
-		pass
+                will_do_turn = True
+
+		for mob in self._state.map.get_mobs():
+                        if mob.next_turn == None:
+
+                                will_do_turn = False
+
+                if will_do_turn:
+
+                        self._turn()
 
 class State(object):
 	"""
@@ -258,7 +331,11 @@ class State(object):
 	"""
 
 	def __init__(self, saved_state):
-		"""Initialize the State from a save."""
+		"""
+                Initialize the State from a save.
+
+                Member variables have free reign to edit saved_state.
+                """
 
 		# Load from the saved state
 		self.map = Map(saved_state["map"])
@@ -300,6 +377,7 @@ class Map(object):
 
 	Map.__init__(self, saved_state)
 	Map.__str__(self)
+        Map.get_mobs(self)
 
 	Map._size
 	Map.grid
@@ -347,12 +425,25 @@ class Map(object):
 
 		return json.dumps(state)
 
+	def get_mobs(self):
+                """Return all the mobs in the map."""
+
+                mob_list = []
+
+                for col in self.grid:
+                        for tile in col:
+
+                                mob_list.extend(tile.get_mobs())
+
+                return mob_list
+
 class Tile(object):
 	"""
 	A tile on the map, potentially containing many entities
 
 	Tile.__init__(self, saved_state, coords)
 	Tile.__str__(self)
+        Tile.get_mobs(self)
 
 	Tile.coords
 	Tile.layers
@@ -417,7 +508,19 @@ class Tile(object):
 		state = {"layers": layers_list}
 
 		return json.dumps(state)
-		
+
+	def get_mobs(self):
+                """Get all the mobs in the tile"""
+
+                mob_list = []
+
+                for layer in self.layers:
+                        for permeability in layer.keys():
+                                if type(layer[permeability]) == Mob:
+
+                                        mob_list.append(layer[permeability])
+
+                return mob_list
 
 class Entity(object):
 	"""
@@ -471,14 +574,48 @@ class Mob(Entity):
 	An entity with an AI
 
 	Mob.__init__(self, saved_state, coords)
+	Mob.__str__(self)
+	Mob.get_actions(self)
+
+	Mob._actions
+	Mob.ai
+	Mob.next_turn
 
 	Also includes some member variables from Entity
 	"""
 
 	def __init__(self, saved_state, coords):
-		"""Create a Mob from a saved state."""
+		"""
+		Create a Mob from a saved state.
 
+		You might want to send saved_state as a deepcopy, as it is modified
+		"""
+
+		# Restore Mob-only variables by popping
+		self._actions = saved_state.pop("actions")
+		self.ai = saved_state.pop("ai")
+		self.next_turn = saved_state.pop("next_turn")
+
+		# Do super.__init__ with the non-Mob-only variables
 		super(Mob, self).__init__(saved_state, coords)
+
+	def __str__(self):
+		"""
+		Create a string representation used for saving.
+
+		self.coords is a soft reference, so it is not saved.
+		"""
+
+		state = {       "id": self.id, "permeability": self.permeability,
+				"ai": self.ai, "next_turn": self.next_turn,
+				"actions": self._actions}
+
+		return json.dumps(state)
+
+	def get_actions(self):
+                """Return the mob's actions."""
+
+                return self._actions
 
 # Functions
 
