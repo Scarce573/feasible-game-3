@@ -38,6 +38,9 @@ DIR_OFFSETS = { DIR_NORTH: (0, -1),
                 DIR_WEST: (-1, 0),
                 DIR_NORTHWEST: (-1, -1)}
 
+FOCUS_MAP = 0
+FOCUS_CONSOLE = 1
+
 VIEW_MAP = 0
 VIEW_DC = 1
 
@@ -101,6 +104,15 @@ class App(object):
 		# Get and evaluate I/O
 		key = self._screen.getch()
 
+		if key != curses.ERR:
+			try:
+
+				self._game.eval_echo(chr(key))
+
+			except ValueError:
+
+				pass
+
 		if str(key) in self._options["controls"] and key != curses.ERR:
 
 			self._game.eval_control_string(self._options["controls"][str(key)])
@@ -143,15 +155,25 @@ class Game(object):
 
 	Game.__init__(self, app, options)
         Game._act_move(self, mob, direction)
+	Game._build_controls(self)
         Game._do_action(self, mob, action)
+	Game._io_console_echo(self, char)
+	Game._io_console_input(self)
+	Game._io_console_submit(self)
 	Game._io_move_north(self)
 	Game._io_move_west(self)
 	Game._io_move_south(self)
 	Game._io_move_east(self)
 	Game._io_pause(self)
+	Game._mod_change_index(self, index, to_value)
+	Game._mod_console_add_char(self, char)
+	Game._mod_console_new_message(self)
+	Game._mod_console_run_message(self)
 	Game._mod_move(self, mob, to_coords)
+	Game._mod_set_next_turn(self, mob, action)
 	Game._turn(self)
 	Game.eval_control_string(self, string)
+	Game.eval_echo(self, char)
 	Game.loop(self)
 
 	Game._app
@@ -163,12 +185,8 @@ class Game(object):
 		"""Initialize Game, starting the game."""
 
 		# Initialize variables
-		self._app = app
-		self._controls = {      "move_north": self._io_move_north,
-					"move_west": self._io_move_west,
-					"move_south": self._io_move_south,
-					"move_east": self._io_move_east,
-					"pause": self._io_pause}
+		self._app = app		
+
 		self._state = None
 		# *** DEBUG ***
 		path = os.path.join(    os.path.dirname(__file__), 
@@ -176,7 +194,8 @@ class Game(object):
 		f = open(path, 'r')
 		self._state = State(json_loads_str(f.read()))
 		# *** DEUBG ***
-		pass
+		
+		self._build_controls()
 
         def _act_move(self, mob, direction):
                 """
@@ -192,6 +211,40 @@ class Game(object):
                 # Execute the movement
                 self._mod_move(mob, to_coords)
 
+	def _build_controls(self):
+		"""
+		Build the controls based off of index.
+
+		This is the only function which can edit self._controls.
+		"""
+
+		# The controls for the map view
+		if self._state.index[0] == VIEW_MAP:
+
+			# You're interacting with the map
+			if self._state.index[2] == FOCUS_MAP:
+
+				self._controls = {      "move_north": self._io_move_north,
+							"move_west": self._io_move_west,
+							"move_south": self._io_move_south,
+							"move_east": self._io_move_east,
+							"pause": self._io_pause,
+							"console_submit": None,
+							"console_input": self._io_console_input,
+							"echo": None}
+
+			# You're interacting with the conosle
+			if self._state.index[2] == FOCUS_CONSOLE:
+
+				self._controls = {      "move_north": None,
+							"move_west": None,
+							"move_south": None,
+							"move_east": None,
+							"pause": None,
+							"console_submit": self._io_console_submit,
+							"console_input": None,
+							"echo": self._io_console_echo}
+
         def _do_action(self, mob, action):
                 """Change state based on which action is performed by what mob."""
 
@@ -202,33 +255,50 @@ class Game(object):
                 # *** DEBUG ***
                 pass
 
+	def _io_console_echo(self, char):
+		"""Deal with with echo character input."""
+
+		self._mod_console_add_char(char)
+
+	def _io_console_input(self):
+		"""Switch index to input into the console."""
+
+		self._mod_change_index(2, FOCUS_CONSOLE)
+		self._mod_console_new_message()
+
+	def _io_console_submit(self):
+		"""Run the command currently at the bottom of the message log"""
+
+		self._mod_change_index(2, FOCUS_MAP)
+		self._mod_console_run_message()
+
 	def _io_move_north(self):
 		"""Prepare to move the player character north."""
 		
 		player = self._state.index[1]
 		ai_type = player.ai.split(":")[-1]
-		player.next_turn = ai[ai_type].DefAI.get_move(player, DIR_NORTH)
+		self._mod_set_next_turn(player, ai[ai_type].DefAI.get_move(player, DIR_NORTH))
 
 	def _io_move_west(self):
 		"""Prepare to move the player character west."""
 
 		player = self._state.index[1]
 		ai_type = player.ai.split(":")[-1]
-		player.next_turn = ai[ai_type].DefAI.get_move(player, DIR_WEST)
+		self._mod_set_next_turn(player, ai[ai_type].DefAI.get_move(player, DIR_WEST))
 
 	def _io_move_south(self):
 		"""Prepare to move the player character south."""
 
 		player = self._state.index[1]
 		ai_type = player.ai.split(":")[-1]
-		player.next_turn = ai[ai_type].DefAI.get_move(player, DIR_SOUTH)
+		self._mod_set_next_turn(player, ai[ai_type].DefAI.get_move(player, DIR_SOUTH))
 
 	def _io_move_east(self):
 		"""Prepare to move the player character east."""
 
 		player = self._state.index[1]
 		ai_type = player.ai.split(":")[-1]
-		player.next_turn = ai[ai_type].DefAI.get_move(player, DIR_EAST)
+		self._mod_set_next_turn(player, ai[ai_type].DefAI.get_move(player, DIR_EAST))
 
 	def _io_pause(self):
 		"""Quit the game."""
@@ -236,6 +306,33 @@ class Game(object):
                 # *** DEBUG ***
 		self._app.stop()
                 # *** DEBUG ***
+
+	def _mod_change_index(self, index, to_value):
+		"""Change self._state.index safely."""
+
+		self._state.index[index] = to_value
+		self._build_controls()
+
+	def _mod_console_add_char(self, char):
+		"""Add a character to the console."""
+
+		self._state.message_log[-1] = self._state.message_log[-1] + char
+
+	def _mod_console_new_message(self):
+		"""Begin a new message in the console."""
+
+		self._state.message_log.append("")
+
+	def _mod_console_run_message(self):
+		"""Run the current console message."""
+
+		try:
+
+			exec(self._state.message_log[-1])
+
+		except:
+
+			self._state.message_log.append("Error!")
 
 	def _mod_move(self, entity, to_coords):
 		"""
@@ -286,6 +383,11 @@ class Game(object):
 		# Fix entity.coords
 		entity.coords = to_coords
 
+	def _mod_set_next_turn(self, mob, action):
+		"""Set the next turn of the mob."""
+
+		mob.next_turn = action
+
         def _turn(self):
                 """Execute the actions of a turn"""
 
@@ -303,7 +405,16 @@ class Game(object):
 	def eval_control_string(self, string):
 		"""Evaluate a control string, mapping it to a Game._io_* function."""
 
-		self._controls[string]()
+		if self._controls[string]:
+
+			self._controls[string]()
+
+	def eval_echo(self, char):
+		"""Evaluate a character text input."""
+
+		if self._controls["echo"]:
+
+			self._controls["echo"](char)
 
 	def loop(self):
 		"""Perform a main game loop."""
@@ -327,6 +438,7 @@ class State(object):
 	State.__str__(self)
 
 	State.map
+	State.message_log
 	State.index
 	"""
 
@@ -339,6 +451,7 @@ class State(object):
 
 		# Load from the saved state
 		self.map = Map(saved_state["map"])
+		self.message_log = saved_state["message_log"]
 		
 		# Load index
 		self.index = saved_state["index"]
@@ -367,7 +480,7 @@ class State(object):
 			saved_index[1] = [self.index[1].coords, self.index[1].permeability]
 
 		# Construct the state and return
-		state = {"map": json_loads_str(str(self.map)), "index": saved_index}
+		state = {"map": json_loads_str(str(self.map)), "index": saved_index, "message_log": self.message_log}
 
 		return json.dumps(state)
 

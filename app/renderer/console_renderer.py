@@ -14,7 +14,8 @@ class Renderer(object):
 	A renderer which uses curses to render onto a console.
 
 	Renderer.__init__(self)
-	Renderer._make_map(self)
+	Renderer._make_map(self, game_map)
+	Renderer._make_message_log(self, game_message_log)
 	Renderer.loop(self)
 
 	Renderer._app
@@ -65,13 +66,38 @@ class Renderer(object):
 		# Return the map pad
 		return map_pad
 
+	def _make_message_log(self, game_message_log):
+
+		# Make a pad for message log
+		message_log_pad = curses.newpad(4, 48)
+
+		# Construct the message log pad
+		try:
+			message_log_pad.addstr(3, 0, game_message_log[-1])
+			message_log_pad.addstr(2, 0, game_message_log[-2])
+			message_log_pad.addstr(1, 0, game_message_log[-3])
+			message_log_pad.addstr(0, 0, game_message_log[-4])
+
+		except:
+
+			pass
+
+		# Return the message log pad
+		return message_log_pad
+
 	def loop(self):
 
 		# Load information
 		game_map = self._app._game._state.map
+		game_message_log = self._app._game._state.message_log
 
 		# Get pads
 		map_pad = self._make_map(game_map)
+		message_log_pad = self._make_message_log(game_message_log)
 
 		# Print pads to scren
-		map_pad.refresh(0, 0, 0, 0, game_map._size[1], game_map._size[0])
+		map_pad.noutrefresh(0, 0, 0, 0, game_map._size[1], game_map._size[0])
+		message_log_pad.noutrefresh(0, 0, game_map._size[1], 0, game_map._size[1] + 3, game_map._size[0])
+
+		# Update
+		curses.doupdate()
