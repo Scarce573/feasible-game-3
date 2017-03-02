@@ -74,7 +74,8 @@ class App(object):
 		game_options_file.close()
 
 		# Load renderer options
-		renderer_options_path = os.path.join(   os.path.dirname(__file__),                                                              "renderer",
+		renderer_options_path = os.path.join(   os.path.dirname(__file__),
+							"renderer",
 							"options.json")
 		renderer_options_file = open(renderer_options_path, 'r')
 		renderer_options = json_loads_str(renderer_options_file.read())
@@ -91,6 +92,7 @@ class App(object):
 
 		curses.noecho()
 		curses.cbreak()
+		curses.curs_set(0)
 		self._screen.nodelay(1)
 		self._screen.keypad(1)
 
@@ -104,6 +106,7 @@ class App(object):
 		# Get and evaluate I/O
 		key = self._screen.getch()
 
+		# Evaluate text input
 		if key != curses.ERR:
 			try:
 
@@ -113,9 +116,13 @@ class App(object):
 
 				pass
 
+		# Evaluate the first key binding which does something
 		if str(key) in self._options["controls"] and key != curses.ERR:
+			for control_string in self._options["controls"][str(key)]:
+				# This if clause executes the action and returns a boolean if it did anything
+				if self._game.eval_control_string(control_string):
 
-			self._game.eval_control_string(self._options["controls"][str(key)])
+					break
 
 	def _quit(self):
 		"""Clean up and shut down the app."""
@@ -123,6 +130,7 @@ class App(object):
 		# Shut down curses
 		self._screen.keypad(0)
 		self._screen.nodelay(0)
+		curses.curs_set(1)
 		curses.nocbreak()
 		curses.echo()
 		curses.endwin()
@@ -190,7 +198,7 @@ class Game(object):
 		self._state = None
 		# *** DEBUG ***
 		path = os.path.join(    os.path.dirname(__file__), 
-					"debug/state3.json")
+					"debug/state.json")
 		f = open(path, 'r')
 		self._state = State(json_loads_str(f.read()))
 		# *** DEUBG ***
@@ -231,7 +239,7 @@ class Game(object):
 							"pause": self._io_pause,
 							"console_submit": None,
 							"console_input": self._io_console_input,
-							"echo": None}
+							"_echo": None}
 
 			# You're interacting with the conosle
 			if self._state.index[2] == FOCUS_CONSOLE:
@@ -243,13 +251,13 @@ class Game(object):
 							"pause": None,
 							"console_submit": self._io_console_submit,
 							"console_input": None,
-							"echo": self._io_console_echo}
+							"_echo": self._io_console_echo}
 
         def _do_action(self, mob, action):
                 """Change state based on which action is performed by what mob."""
 
                 # *** DEBUG ***
-                path = os.path.join(os.path.dirname(__file__), *action.split(':'))
+                path = _path_from_id(action)
                 action_file = open(path, 'r')
                 exec(action_file.read())
                 # *** DEBUG ***
@@ -276,32 +284,32 @@ class Game(object):
 		"""Prepare to move the player character north."""
 		
 		player = self._state.index[1]
-		ai_type = player.ai.split(":")[-1]
+		ai_type = player.ai.split(':')[-1]
 		self._mod_set_next_turn(player, ai[ai_type].DefAI.get_move(player, DIR_NORTH))
 
 	def _io_move_west(self):
 		"""Prepare to move the player character west."""
 
 		player = self._state.index[1]
-		ai_type = player.ai.split(":")[-1]
+		ai_type = player.ai.split(':')[-1]
 		self._mod_set_next_turn(player, ai[ai_type].DefAI.get_move(player, DIR_WEST))
 
 	def _io_move_south(self):
 		"""Prepare to move the player character south."""
 
 		player = self._state.index[1]
-		ai_type = player.ai.split(":")[-1]
+		ai_type = player.ai.split(':')[-1]
 		self._mod_set_next_turn(player, ai[ai_type].DefAI.get_move(player, DIR_SOUTH))
 
 	def _io_move_east(self):
 		"""Prepare to move the player character east."""
 
 		player = self._state.index[1]
-		ai_type = player.ai.split(":")[-1]
+		ai_type = player.ai.split(':')[-1]
 		self._mod_set_next_turn(player, ai[ai_type].DefAI.get_move(player, DIR_EAST))
 
 	def _io_pause(self):
-		"""Quit the game."""
+		"""Pause the game, also known as quit the game (for now)"""
 
                 # *** DEBUG ***
 		self._app.stop()
@@ -321,14 +329,24 @@ class Game(object):
 	def _mod_console_new_message(self):
 		"""Begin a new message in the console."""
 
-		self._state.message_log.append("")
+		self._state.message_log.append("> ")
 
 	def _mod_console_run_message(self):
 		"""Run the current console message."""
 
+		self._state.message_log[-1] = self._state.message_log[-1][2:]
+
 		try:
 
 			exec(self._state.message_log[-1])
+
+		except SyntaxError:
+
+			pass
+
+		except NameError:
+
+			pass
 
 		except:
 
@@ -399,22 +417,38 @@ class Game(object):
                 # Reset/decide the actions for all the next turns
                 for mob in self._state.map.get_mobs():
 
-                        ai_type = mob.ai.split(":")[-1]
+                        ai_type = mob.ai.split(':')[-1]
                         mob.next_turn = ai[ai_type].DefAI.get_next_turn(mob)
 
 	def eval_control_string(self, string):
-		"""Evaluate a control string, mapping it to a Game._io_* function."""
+		"""
+		Evaluate a control string, mapping it to a Game._io_* function.
+
+
+		Returns True or False to tell App if it did anything. That lets it know if it 
+		should continue processing the input.
+		"""
 
 		if self._controls[string]:
 
 			self._controls[string]()
+			return True
+
+		else:
+
+			# The action is unbound right now, so tell the game to find another method to call
+			return False
 
 	def eval_echo(self, char):
-		"""Evaluate a character text input."""
+		"""
+		Evaluate a character text input.
 
-		if self._controls["echo"]:
+		The "_echo" control string is reserved for this function.
+		"""
 
-			self._controls["echo"](char)
+		if self._controls["_echo"]:
+
+			self._controls["_echo"](char)
 
 	def loop(self):
 		"""Perform a main game loop."""
@@ -732,6 +766,7 @@ class Mob(Entity):
 
 # Functions
 
-def directory_from_id(id_):
+def _path_from_id(id_):
+	"""Get a path to a file based on its ID."""
 
-	return os.path.join(id_.split(':'))
+	return os.path.join(os.path.dirname(__file__), *id_.split(':'))

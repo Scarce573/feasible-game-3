@@ -5,11 +5,14 @@
 # Modules
 import curses
 import os
+
 from mirec_miskuf_json import json_loads_str
+
+from ..renderer_super import Renderer
 
 # Classes
 
-class Renderer(object):
+class ConsoleRenderer(Renderer):
 	"""
 	A renderer which uses curses to render onto a console.
 
@@ -26,9 +29,8 @@ class Renderer(object):
 	def __init__(self, app, options):
 		"""Intialize the Renderer."""
 
-		# Initialize variables
-		self._app = app
-		self._options = options
+		# Call super.__init__
+		super(ConsoleRenderer, self).__init__(app, options)
 
 		# Get id to character dict
 		character_key_path = os.path.join(	os.path.dirname(__file__), 
@@ -48,10 +50,8 @@ class Renderer(object):
 
 			tile_to_render = game_map.grid[x_val][y_val]
 
-			# *** DEBUG ***
 			perm = min(tile_to_render.layers[-1].keys())
 			entity_to_render = tile_to_render.layers[-1][perm]
-                        # *** DEBUG ***
 
 			ch = self._character_key[entity_to_render.id][0]
 
@@ -72,20 +72,25 @@ class Renderer(object):
 		message_log_pad = curses.newpad(4, 48)
 
 		# Construct the message log pad
-		try:
-			message_log_pad.addstr(3, 0, game_message_log[-1])
-			message_log_pad.addstr(2, 0, game_message_log[-2])
-			message_log_pad.addstr(1, 0, game_message_log[-3])
-			message_log_pad.addstr(0, 0, game_message_log[-4])
+		try: message_log_pad.addstr(0, 0, game_message_log[-4])
+		except: pass
 
-		except:
+		try: message_log_pad.addstr(1, 0, game_message_log[-3])
+		except: pass
 
-			pass
+		try: message_log_pad.addstr(2, 0, game_message_log[-2])
+		except: pass
+
+		try: message_log_pad.addstr(3, 0, game_message_log[-1])
+		except: pass
 
 		# Return the message log pad
 		return message_log_pad
 
 	def loop(self):
+
+		# Call super.loop, which is unnecessary for now but good form
+		super(ConsoleRenderer, self).loop()
 
 		# Load information
 		game_map = self._app._game._state.map
@@ -100,4 +105,5 @@ class Renderer(object):
 		message_log_pad.noutrefresh(0, 0, game_map._size[1], 0, game_map._size[1] + 3, game_map._size[0])
 
 		# Update
+		self._app._screen.move(20, 0)
 		curses.doupdate()

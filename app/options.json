@@ -1,14 +1,14 @@
 {
 "controls":	
 	{
-		"112": "pause", 
+		"112": ["pause"], 
 
-		"119": "move_north",
-		"97": "move_west", 
-		"115": "move_south", 
-		"100": "move_east",
+		"119": ["move_north"],
+		"97": ["move_west"], 
+		"115": ["move_south"], 
+		"100": ["move_east"],
 
-		"10": "console_submit",
-		"47": "console_input"
+		"10": ["console_input", "console_submit"],
+		"47": ["console_input"]
 	}
 }

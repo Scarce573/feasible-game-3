@@ -1,4 +1,4 @@
-from ... import ai_super
+from ...ai_super import AI
 
 DIR_NORTH = 0
 DIR_NORTHEAST = 1
@@ -18,7 +18,7 @@ DIR_ACTION = {	DIR_NORTH: "default:action:move_north",
 		DIR_WEST: "default:action:move_west",
 		DIR_NORTHWEST: "default:action:move_northwest"}
 
-class DefAI(ai_super.AI):
+class DefAI(AI):
 	"""
 	The AI for a user-controlled mob
 
