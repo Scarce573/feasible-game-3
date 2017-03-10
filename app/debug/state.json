@@ -12,6 +12,10 @@
         ], 
         0
     ], 
+    "stored_index": [
+        2, 
+        0
+    ], 
     "map": {
         "_type": "Map", 
         "grid": [

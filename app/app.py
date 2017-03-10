@@ -8,6 +8,7 @@ import curses
 import json
 import os
 import pprint
+import traceback
 
 from mirec_miskuf_json import json_loads_str
 
@@ -44,6 +45,7 @@ FOCUS_CONSOLE = 1
 
 VIEW_MAP = 0
 VIEW_DC = 1
+VIEW_PAUSE = 2
 
 # Classes
 class App(object):
@@ -141,14 +143,21 @@ class App(object):
 		self._is_running = False
 
 	def start(self):
-		"""Start looping."""
+		"""Start looping; this is called independently and is the last thing to run."""
 
 		# Loop
 		self._is_running = True
 
 		while self._is_running:
+			try:
 
-			self._loop()
+				self._loop()
+
+			except:
+
+				self._quit()
+				traceback.print_exc()
+				return
 
 		# Quit when the loop stops
 		self._quit()
@@ -159,12 +168,18 @@ class Game(object):
 
 	The Game._act_* namespace is the collection of methods that actions should call.
 	The Game._io_* namespace is used for various control inputs.
-	The Game._mod_* namespace is used for modifying state (__init__ does it also)
+	The Game._mod_* namespace is used for modifying state (__init__ does it also); anything can call these
+	The Game.co_* namespace is for Differentia.method to hold.
 
 	Game.__init__(self, app, options)
 	Game._act_move(self, mob, direction)
 	Game._build_controls(self)
-	Game._do_action(self, mob, action)
+	Game._deref_index(self)
+	Game._do_action(self, mob, alass Differentia(objectction)
+	Game._io_coag_back(self)
+	Game._io_coag_next(self)
+	Game._io_coag_prev(self)
+	Game._io_coag_select(self)
 	Game._io_console_echo(self, char)
 	Game._io_console_input(self)
 	Game._io_console_submit(self)
@@ -173,13 +188,18 @@ class Game(object):
 	Game._io_move_south(self)
 	Game._io_move_east(self)
 	Game._io_pause(self)
-	Game._mod_change_index(self, index, to_value)
+	Game._mod_change_index(self, index=0, to_value=None, set_all=False, stored_index=False)
 	Game._mod_console_add_char(self, char)
 	Game._mod_console_new_message(self)
 	Game._mod_console_run_message(self)
 	Game._mod_move(self, mob, to_coords)
 	Game._mod_set_next_turn(self, mob, action)
+	Game._mod_toggle_index(self)
+	Game._stop(self)
 	Game._turn(self)
+	Game.co_pass(self)
+	Game.co_quit(self)
+	Game.co_resume(self)
 	Game.eval_control_string(self, string)
 	Game.eval_echo(self, char)
 	Game.loop(self)
@@ -201,7 +221,7 @@ class Game(object):
 								"debug/state.json")
 		with open(path, 'r') as state_file:
 
-			self._state = State(json_loads_str(state_file.read()))
+			self._state = load_from_dict(json_loads_str(state_file.read()))
 		# *** DEUBG ***
 		
 		# Build controls
@@ -234,13 +254,31 @@ class Game(object):
 		This is the only function which can edit self._controls.
 		"""
 
+		# The coagulate controls
+		coagulate_controls = {	"coag_back": self._io_coag_back,
+								"coag_next": self._io_coag_next,
+								"coag_prev": self._io_coag_prev,
+								"coag_select": self._io_coag_select,
+								"move_north": None,
+								"move_west": None,
+								"move_south": None,
+								"move_east": None,
+								"pause": None,
+								"console_submit": None,
+								"console_input": None,
+								"_echo": None}
+
 		# The controls for the map view
 		if self._state.index[0] == VIEW_MAP:
 
 			# You're interacting with the map
 			if self._state.index[2] == FOCUS_MAP:
 
-				self._controls = {	"move_north": self._io_move_north,
+				self._controls = {	"coag_back": None,
+									"coag_next": None,
+									"coag_prev": None,
+									"coag_select": None,
+									"move_north": self._io_move_north,
 									"move_west": self._io_move_west,
 									"move_south": self._io_move_south,
 									"move_east": self._io_move_east,
@@ -250,9 +288,13 @@ class Game(object):
 									"_echo": None}
 
 			# You're interacting with the conosle
-			if self._state.index[2] == FOCUS_CONSOLE:
+			elif self._state.index[2] == FOCUS_CONSOLE:
 
-				self._controls = {	"move_north": None,
+				self._controls = {	"coag_back": None,
+									"coag_next": None,
+									"coag_prev": None,
+									"coag_select": None,
+									"move_north": None,
 									"move_west": None,
 									"move_south": None,
 									"move_east": None,
@@ -260,6 +302,38 @@ class Game(object):
 									"console_submit": self._io_console_submit,
 									"console_input": None,
 									"_echo": self._io_console_echo}
+
+		# The controls for pause view
+		elif self._state.index[0] == VIEW_PAUSE:
+
+			self._controls = coagulate_controls
+
+	def _deref_index(self, index):
+		"""
+		Get whatever is at the end of the given index.
+
+		This function should always return a Coagulate or a Differentia.
+		"""
+
+		if index[0] == VIEW_MAP or index[0] == VIEW_DC:
+			
+			coag_or_dif = index[1].dif_coag
+
+			for sub_index in index[2:]:
+
+				coag_or_dif = coag_or_dif[sub_index]
+
+			return coag_or_dif
+
+		elif index[0] == VIEW_PAUSE:
+
+			coag_or_dif = self._state.pause_coag
+
+			for sub_index in index[1:]:
+
+				coag_or_dif = coag_or_dif[sub_index]
+
+			return coag_or_dif
 
 	def _do_action(self, mob, action):
 		"""Change state based on which action is performed by what mob."""
@@ -270,6 +344,48 @@ class Game(object):
 		exec(action_file.read())
 		# *** DEBUG ***
 		pass
+
+	def _io_coag_back(self):
+		"""Go back into the parent of the current coagulate."""
+		
+		if not self._deref_index(self._state.index[:-1]).is_root:
+
+			self._mod_change_index(to_value=self._state.index[:-1], set_all=True)
+
+		else:
+
+			# You're just below root so return to what you were doing earlier
+			self._mod_toggle_index()
+
+	def _io_coag_next(self):
+		"""Focus on the next thing in the coagulate."""
+
+		if len(self._deref_index(self._state.index[:-1])) > self._state.index[-1] + 1:
+
+			self._mod_change_index(-1, self._state.index[-1] + 1)
+
+	def _io_coag_prev(self):
+		"""Focus on the previous thing in the coagulate."""
+
+		if self._state.index[-1] > 0:
+
+			self._mod_change_index(-1, self._state.index[-1] - 1)
+
+	def _io_coag_select(self):
+		"""Step into a Coagulate or run a Game.co_* method."""
+
+		# The referenced Differentia has nothing below it, so call method
+	 	if type(self._deref_index(self._state.index)) == Differentia:
+			if callable(self._deref_index(self._state.index).method):
+
+				self._deref_index(self._state.index).method.__call__(self)
+				return
+
+		# There's still options to choose from below you, so step in.
+		new_index = copy.copy(self._state.index)
+		new_index.append(0)
+
+		self._mod_change_index(to_value=new_index, set_all=True)
 
 	def _io_console_echo(self, char):
 		"""Deal with with echo character input."""
@@ -317,17 +433,33 @@ class Game(object):
 		self._mod_set_next_turn(player, ai[ai_type].DefAI.get_move(player, DIR_EAST))
 
 	def _io_pause(self):
-		"""Pause the game, also known as quit the game (for now)"""
+		"""Pause the game."""
 
-		# *** DEBUG ***
-		self._app.stop()
-		# *** DEBUG ***
+		self._mod_change_index(to_value=[VIEW_PAUSE, 0], set_all=True, stored_index=True)
+		self._mod_toggle_index()
 
-	def _mod_change_index(self, index, to_value):
+	def _mod_change_index(self, index=0, to_value=None, set_all=False, stored_index=False):
 		"""Change self._state.index safely."""
 
-		self._state.index[index] = to_value
-		self._build_controls()
+		if stored_index:
+			if set_all:
+
+				self._state.stored_index = to_value
+
+			else:
+
+				self._state.stored_index[index] = to_value
+
+		else:
+			if set_all:
+
+				self._state.index = to_value
+
+			else:
+
+				self._state.index[index] = to_value
+
+			self._build_controls()
 
 	def _mod_console_add_char(self, char):
 		"""Add a character to the console."""
@@ -414,6 +546,21 @@ class Game(object):
 
 		mob.next_turn = action
 
+	def _mod_toggle_index(self):
+		"""Toggle between using index and stored_index."""
+
+		# Copy old indecies for switching
+		old_index = copy.copy(self._state.index)		# Do not make this a deepcopy
+		new_index = copy.copy(self._state.stored_index)	# Do not make this a deepcopy
+
+		# Safely swtich
+		self._mod_change_index(to_value=new_index, set_all=True)
+		self._mod_change_index(to_value=old_index, set_all=True, stored_index=True)
+
+	def _stop(self):
+
+		self._app.stop()
+
 	def _turn(self):
 		"""Execute the actions of a turn"""
 
@@ -427,6 +574,20 @@ class Game(object):
 
 			ai_type = mob.ai.split(':')[-1]
 			self._mod_set_next_turn(mob, ai[ai_type].DefAI.get_next_turn(self._state.map, mob))
+
+	def co_pass(self):
+
+		pass
+
+	def co_quit(self):
+		"""Quit the game by way of the menu."""
+
+		self._stop()
+	
+	def co_resume(self):
+		"""Resume the game."""
+
+		self._mod_toggle_index()
 
 	def eval_control_string(self, string):
 		"""
@@ -481,25 +642,27 @@ class State(object):
 	State.__str__(self)
 	State.to_dict(self)
 
+	State.index
 	State.map
 	State.message_log
-	State.index
+	State.pause_coag
+	State.stored_index
 	"""
 
 	def __init__(self, saved_state=None):
 		"""
-		Initialize the State from a save.
+		Initialize the State, perhaps from a saved state.
 
 		Member variables have free reign to edit saved_state.
 		"""
 
 		if saved_state:
 
-			# Load from the saved state
+			# Loading from a saved_state dict
 			self.map = load_from_dict(saved_state["map"])
 			self.message_log = saved_state["message_log"]
-			
-			# Load index
+
+			# Construct index
 			self.index = saved_state["index"]
 
 			if saved_state["index"][0] == VIEW_MAP or saved_state["index"][0] == VIEW_DC:
@@ -515,6 +678,26 @@ class State(object):
 
 				self.index[1] = mob
 
+			# Construct stored_index
+			self.stored_index = saved_state["stored_index"]
+
+			if saved_state["stored_index"][0] == VIEW_MAP or saved_state["stored_index"][0] == VIEW_DC:
+
+				mob_loc_x = saved_state["stored_index"][1][0][0]
+				mob_loc_y = saved_state["stored_index"][1][0][1]
+				mob_layer = saved_state["stored_index"][1][0][2]
+				mob_permeability = saved_state["stored_index"][1][1]
+
+				tile = self.map.grid[mob_loc_x][mob_loc_y]
+				layer = tile.layers[mob_layer]
+				mob = layer[mob_permeability]
+
+				self.stored_index[1] = mob
+
+		self.pause_coag = Coagulate(tree=[	Differentia(name="Quit", method=Game.co_quit),
+											Differentia(name="Resume", method=Game.co_resume)],
+									is_root=True)
+
 	def __repr__(self):
 		"""Return a syntactically correct string representation of the State based off of to_dict."""
 
@@ -523,7 +706,7 @@ class State(object):
 	def __str__(self):
 		"""Return a string representation of the State based off of to_dict."""
 
-		return json.dumps(self.to_dict())
+		return json.dumps(self.to_dict(), indent=4, separators=(",", ": "), sort_keys=True)
 
 	def to_dict(self):
 		"""Create a JSON-serializable dict representation of the State."""
@@ -561,25 +744,31 @@ class Map(object):
 	"""
 
 	def __init__(self, saved_state=None):
-		"""Initialize the Map from a saved state."""
+		"""Initialize the Map, perhaps from a saved state."""
 
-		# Load from the saved state
-		self._size = tuple(saved_state["size"])
+		if saved_state:
 
-		# Load the grid
-		self.grid = []
+			# Loading from a saved_state dict
+			self._size = tuple(saved_state["size"])
 
-		for x_val in range(len(saved_state["grid"])):
+			# Construct grid
+			self.grid = []
 
-			saved_col = saved_state["grid"][x_val]
-			col = []
+			for x_val in range(len(saved_state["grid"])):
 
-			for y_val in range(len(saved_col)):
+				saved_col = saved_state["grid"][x_val]
+				col = []
 
-				saved_tile = saved_state["grid"][x_val][y_val]
-				col.append(load_from_dict(saved_tile, [x_val, y_val]))
+				for y_val in range(len(saved_col)):
 
-			self.grid.append(col)
+					saved_tile = saved_state["grid"][x_val][y_val]
+					col.append(load_from_dict(saved_tile, [x_val, y_val]))
+
+				self.grid.append(col)
+
+		else:
+
+			pass
 
 	def __repr__(self):
 		"""Return a syntactically correct string representation of the Map based off of to_dict."""
@@ -589,7 +778,7 @@ class Map(object):
 	def __str__(self):
 		"""Return a string representation of the Map based off of to_dict."""
 
-		return json.dumps(self.to_dict())
+		return json.dumps(self.to_dict(), indent=4, separators=(",", ": "), sort_keys=True)
 
 	def get_mobs(self):
 		"""Return all the mobs in the Map."""
@@ -681,7 +870,7 @@ class Tile(object):
 	def __str__(self):
 		"""Return a string representation of the Tile based off of to_dict."""
 
-		return json.dumps(self.to_dict())
+		return json.dumps(self.to_dict(), indent=4, separators=(",", ": "), sort_keys=True)
 
 	def get_mobs(self):
 		"""Get all the mobs in the tile"""
@@ -764,7 +953,7 @@ class Entity(object):
 	def __str__(self):
 		"""Return a string representation of the Entity based off of to_dict."""
 
-		return json.dumps(self.to_dict())
+		return json.dumps(self.to_dict(), indent=4, separators=(",", ": "), sort_keys=True)
 
 	def to_dict(self):
 		"""
@@ -850,7 +1039,7 @@ class Mob(Entity):
 	def __str__(self):
 		"""Return a string representation of the Mob based off of to_dict."""
 
-		return json.dumps(self.to_dict())
+		return json.dumps(self.to_dict(), indent=4, separators=(",", ": "), sort_keys=True)
 
 	def get_actions(self):
 		"""Return the mob's actions."""
@@ -878,12 +1067,14 @@ class Coagulate(object):
 
 	Coagulate.__getitem__(self, index)
 	Coagulate.__init__(self, name="", tree=[], saved_state=None)
+	Coagulate.__len__(self)
 	Coagulate.__repr__(self)
 	Coagulate.__str__(self)
 	Coagulate.to_dict(self)
 
 	Coagulate._tree
 	Coagulate.name
+	Coagulate.is_root
 	"""
 
 	def __getitem__(self, index):
@@ -891,7 +1082,7 @@ class Coagulate(object):
 
 		return self._tree[index]
 
-	def __init__(self, name="", tree=[], saved_state=None):
+	def __init__(self, name="", tree=[], is_root=False, saved_state=None):
 		"""
 		Initialize the Coagulate, perhaps from a saved state.
 
@@ -902,6 +1093,7 @@ class Coagulate(object):
 
 			# Loading from a saved_state dict
 			self.name = saved_state["name"]
+			self.is_root = saved_state["is_root"]
 
 			# Construct tree
 			self._tree = []
@@ -914,6 +1106,12 @@ class Coagulate(object):
 
 			self._tree = tree
 			self.name = name
+			self.is_root = is_root
+
+	def __len__(self):
+		"""Get the length of the Coagulate."""
+
+		return len(self._tree)
 
 	def __repr__(self):
 		"""Return a syntactically correct string representation of the Coagulate based off of to_dict."""
@@ -923,10 +1121,14 @@ class Coagulate(object):
 	def __str__(self):
 		"""Return a string representation of the Coagulate based off of to_dict."""
 
-		return json.dumps(self.to_dict())
+		return json.dumps(self.to_dict(), indent=4, separators=(",", ": "), sort_keys=True)
 
 	def to_dict(self):
-		"""Create a JSON-serializable dict representation of the Coagulate."""
+		"""
+		Create a JSON-serializable dict representation of the Coagulate.
+
+		Coagulate.is_root is a soft reference so it isn't saved.
+		"""
 
 		state = {}
 
@@ -941,6 +1143,7 @@ class Coagulate(object):
 		state["_type"] = "Coagulate"
 		state["tree"] = saved_tree
 		state["name"] = self.name
+		state["is_root"] = self.is_root
 
 		# Return state
 		return state
@@ -951,12 +1154,14 @@ class Differentia(object):
 	
 	Differentia.__getitem__(self, index)
 	Differentia.__init__(self, name="", method=lambda: None, saved_state=None)
+	Differentia.__len__(self)
 	Differentia.__repr__(self)
 	Differentia.__str__(self)
 	Differentia.to_dict(self)
 
 	Differentia.method
 	Differentia.name
+	Differentia.is_root
 	"""
 
 	def __getitem__(self, index):
@@ -964,19 +1169,34 @@ class Differentia(object):
 
 		return self.method[index]
 
-	def __init__(self, name="", method=lambda: None, saved_state=None):
+	def __len__(self):
+		"""Get the length of self.method assuming it's a list."""
+		
+		return len(self.method)
+
+	def __init__(self, name="", method=Game.co_pass, is_root=False, saved_state=None):
 		"""Initialize the Differentia, perhaps from a saved state."""
 
 		if saved_state:
 
 			# Loading from a saved_state dict
-			self.method = load_from_dict(saved_state["method"])
 			self.name = saved_state["name"]
+			self.is_root = saved_state["is_root"]
+
+			# Construct method
+			if type(saved_state["method"]) == str:
+
+				self.method = Game.__dict__[saved_state["method"]]
+
+			else:
+
+				self.method = load_from_dict(saved_state["method"])
 
 		else:
 
 			self.name = name
 			self.method = method
+			self.is_root = is_root
 
 	def __repr__(self):
 		"""Return a syntactically correct string representation of the Differentia based off of to_dict."""
@@ -986,17 +1206,27 @@ class Differentia(object):
 	def __str__(self):
 		"""Return a string representation of the Differentia based off of to_dict."""
 
-		return json.dumps(self.to_dict())
+		return json.dumps(self.to_dict(), indent=4, separators=(",", ": "), sort_keys=True)
 
 	def to_dict(self):
 		"""Create a JSON-serializable dict representation of the Differentia."""
 
 		state = {}
 
+		# Fix method
+		if callable(self.method):
+
+			saved_method = self.method.__name__
+
+		else:
+
+			saved_method = self.method.to_dict()
+
 		# Construct state
 		state["_type"] = "Differentia"
-		state["method"] = self.method.to_dict()
+		state["method"] = saved_method
 		state["name"] = self.name
+		state["is_root"] = self.is_root
 
 		# Return state
 		return state

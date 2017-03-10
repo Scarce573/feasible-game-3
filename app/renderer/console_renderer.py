@@ -10,8 +10,12 @@ from mirec_miskuf_json import json_loads_str
 
 from ..renderer_super import Renderer
 
-# Classes
+# Constants
+VIEW_MAP = 0
+VIEW_DC = 1
+VIEW_PAUSE = 2
 
+# Classes
 class ConsoleRenderer(Renderer):
 	"""
 	A renderer which uses curses to render onto a console.
@@ -19,9 +23,12 @@ class ConsoleRenderer(Renderer):
 	Renderer.__init__(self)
 	Renderer._make_map(self, game_map)
 	Renderer._make_message_log(self, game_message_log)
+	Renderer._view_coag(self)
+	Renderer._view_map(self)
 	Renderer.loop(self)
 
 	Renderer._app
+	Renderer._change_flag
 	Renderer._chracter_key
 	Renderer._options
 	"""
@@ -38,6 +45,9 @@ class ConsoleRenderer(Renderer):
 		character_key_file = open(character_key_path, 'r')
 		self._character_key = json_loads_str(character_key_file.read())
 		character_key_file.close()
+
+		# Etc
+		self._change_flag = VIEW_MAP
 
 	def _make_map(self, game_map):
 
@@ -87,10 +97,58 @@ class ConsoleRenderer(Renderer):
 		# Return the message log pad
 		return message_log_pad
 
-	def loop(self):
+	def _view_coag(self, root_level=0):
 
-		# Call super.loop, which is unnecessary for now but good form
-		super(ConsoleRenderer, self).loop()
+		# Load information
+		game_index = self._app._game._state.index
+
+		cols = []
+
+		for index in range(root_level + 1, len(game_index)):
+
+			coag_or_dif = self._app._game._deref_index(game_index[:index])
+
+			names = []
+
+			for item in range(len(coag_or_dif)):
+
+				names.append(coag_or_dif[item].name)
+
+			cols.append(names)
+
+		# Make pads
+		pads = []
+
+		for names in cols:
+
+			col_pad = curses.newpad(16, 16)
+
+			for index in range(len(names)):
+
+				if names == cols[-1] and index == game_index[-1]:
+
+					col_pad.addstr(index, 0, names[index], curses.A_STANDOUT)
+
+				else:
+
+					col_pad.addstr(index, 0, names[index])
+
+			pads.append(col_pad)
+
+		# Print pads to screen
+		col_num = 0
+
+		for index in [-4, -3, -2, -1]:
+			try:
+
+				pads[index].noutrefresh(0, 0, 0, 16 * col_num, 16, 16 * (col_num + 1))
+				col_num = col_num + 1
+
+			except IndexError:
+
+				pass
+
+	def _view_map(self):
 
 		# Load information
 		game_map = self._app._game._state.map
@@ -104,6 +162,29 @@ class ConsoleRenderer(Renderer):
 		map_pad.noutrefresh(0, 0, 0, 0, game_map._size[1], game_map._size[0])
 		message_log_pad.noutrefresh(0, 0, game_map._size[1], 0, game_map._size[1] + 3, game_map._size[0])
 
+	def loop(self):
+
+		# Call super.loop, which is unnecessary for now but good form
+		super(ConsoleRenderer, self).loop()
+
+		if self._app._game._state.index[0] == VIEW_MAP:
+
+			self._view_map()
+
+			if self._change_flag != VIEW_MAP:
+
+				self._change_flag = VIEW_MAP
+				self._app._screen.redrawwin()
+
+		elif self._app._game._state.index[0] == VIEW_PAUSE:
+
+			self._view_coag(root_level=0)
+
+			if self._change_flag != VIEW_PAUSE:
+
+				self._change_flag = VIEW_PAUSE
+				self._app._screen.redrawwin()
+		
 		# Update
 		self._app._screen.move(20, 0)
 		curses.doupdate()
