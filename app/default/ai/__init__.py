@@ -5,5 +5,6 @@
 # __init__.py for the module default.ai, the AIs of the default datapack for Feasible Game 3
 
 import player
+import zombie
 
-__all__ = ["player"]
+__all__ = ["player", "zombie"]

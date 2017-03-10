@@ -1,8 +1,8 @@
 {
-	"ai": "default:ai:player", 
+	"ai": "default:ai:zombie", 
 	"next_turn": null, 
 	"permeability": 1, 
-	"id": "default:mob:player", 
+	"id": "default:mob:zombie", 
 	"actions": 
 		["default:action:move_north", 
 		"default:action:move_northeast", 
@@ -11,5 +11,6 @@
 		"default:action:move_south", 
 		"default:action:move_southwest", 
 		"default:action:move_west", 
-		"default:action:move_northwest"]
+		"default:action:move_northwest",
+		"default:action:zombie_bite"]
 }

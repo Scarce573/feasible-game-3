@@ -1,12 +1,13 @@
 # Andrew Bogdan
 # Feasible Game 3
-# Version 0.1
+# Version 0.2
 
 # Imports
 import copy
 import curses
 import json
 import os
+import pprint
 
 from mirec_miskuf_json import json_loads_str
 
@@ -30,13 +31,13 @@ DIR_WEST = 6
 DIR_NORTHWEST = 7
 
 DIR_OFFSETS = { DIR_NORTH: (0, -1),
-                DIR_NORTHEAST: (1, -1),
-                DIR_EAST: (1, 0),
-                DIR_SOUTHEAST: (1, 1),
-                DIR_SOUTH: (0, 1),
-                DIR_SOUTHWEST: (-1, 1),
-                DIR_WEST: (-1, 0),
-                DIR_NORTHWEST: (-1, -1)}
+				DIR_NORTHEAST: (1, -1),
+				DIR_EAST: (1, 0),
+				DIR_SOUTHEAST: (1, 1),
+				DIR_SOUTH: (0, 1),
+				DIR_SOUTHWEST: (-1, 1),
+				DIR_WEST: (-1, 0),
+				DIR_NORTHWEST: (-1, -1)}
 
 FOCUS_MAP = 0
 FOCUS_CONSOLE = 1
@@ -45,7 +46,6 @@ VIEW_MAP = 0
 VIEW_DC = 1
 
 # Classes
-
 class App(object):
 	"""
 	The all-encompassing class which connects the computer, game, and the renderer
@@ -67,16 +67,16 @@ class App(object):
 		"""Intialize App, starting the game."""
 
 		# Load game options
-		game_options_path = os.path.join(       os.path.dirname(__file__), 
-							"options.json")
+		game_options_path = os.path.join(	os.path.dirname(__file__), 
+											"options.json")
 		game_options_file = open(game_options_path, 'r')
 		self._options = json_loads_str(game_options_file.read())
 		game_options_file.close()
 
 		# Load renderer options
-		renderer_options_path = os.path.join(   os.path.dirname(__file__),
-							"renderer",
-							"options.json")
+		renderer_options_path = os.path.join(	os.path.dirname(__file__),
+												"renderer",
+												"options.json")
 		renderer_options_file = open(renderer_options_path, 'r')
 		renderer_options = json_loads_str(renderer_options_file.read())
 		renderer_options_file.close()
@@ -157,14 +157,14 @@ class Game(object):
 	"""
 	The class which controls the game, doing modifications on the game state
 
-        The Game._act_* namespace is the collection of methods that actions should call.
+	The Game._act_* namespace is the collection of methods that actions should call.
 	The Game._io_* namespace is used for various control inputs.
 	The Game._mod_* namespace is used for modifying state (__init__ does it also)
 
 	Game.__init__(self, app, options)
-        Game._act_move(self, mob, direction)
+	Game._act_move(self, mob, direction)
 	Game._build_controls(self)
-        Game._do_action(self, mob, action)
+	Game._do_action(self, mob, action)
 	Game._io_console_echo(self, char)
 	Game._io_console_input(self)
 	Game._io_console_submit(self)
@@ -197,27 +197,35 @@ class Game(object):
 
 		self._state = None
 		# *** DEBUG ***
-		path = os.path.join(    os.path.dirname(__file__), 
-					"debug/state.json")
-		f = open(path, 'r')
-		self._state = State(json_loads_str(f.read()))
+		path = os.path.join(	os.path.dirname(__file__), 
+								"debug/state.json")
+		with open(path, 'r') as state_file:
+
+			self._state = State(json_loads_str(state_file.read()))
 		# *** DEUBG ***
 		
+		# Build controls
 		self._build_controls()
 
-        def _act_move(self, mob, direction):
-                """
-                Moves the mob 1 unit in direction so that the mob can collide.
+		# Give mobs their first turn
+		for mob in self._state.map.get_mobs():
 
-                Perhaps this method should return something if there's a failure so action can react?
-                """
+			ai_type = mob.ai.split(':')[-1]
+			self._mod_set_next_turn(mob, ai[ai_type].DefAI.get_next_turn(self._state.map, mob))
 
-                # Calculate the to_coords
-                offset = DIR_OFFSETS[direction]
-                to_coords = (mob.coords[0] + offset[0], mob.coords[1] + offset[1], mob.coords[2])
+	def _act_move(self, mob, direction):
+		"""
+		Moves the mob 1 unit in direction so that the mob can collide.
 
-                # Execute the movement
-                self._mod_move(mob, to_coords)
+		Perhaps this method should return something if there's a failure so action can react?
+		"""
+
+		# Calculate the to_coords
+		offset = DIR_OFFSETS[direction]
+		to_coords = (mob.coords[0] + offset[0], mob.coords[1] + offset[1], mob.coords[2])
+
+		# Execute the movement
+		self._mod_move(mob, to_coords)
 
 	def _build_controls(self):
 		"""
@@ -232,36 +240,36 @@ class Game(object):
 			# You're interacting with the map
 			if self._state.index[2] == FOCUS_MAP:
 
-				self._controls = {      "move_north": self._io_move_north,
-							"move_west": self._io_move_west,
-							"move_south": self._io_move_south,
-							"move_east": self._io_move_east,
-							"pause": self._io_pause,
-							"console_submit": None,
-							"console_input": self._io_console_input,
-							"_echo": None}
+				self._controls = {	"move_north": self._io_move_north,
+									"move_west": self._io_move_west,
+									"move_south": self._io_move_south,
+									"move_east": self._io_move_east,
+									"pause": self._io_pause,
+									"console_submit": None,
+									"console_input": self._io_console_input,
+									"_echo": None}
 
 			# You're interacting with the conosle
 			if self._state.index[2] == FOCUS_CONSOLE:
 
-				self._controls = {      "move_north": None,
-							"move_west": None,
-							"move_south": None,
-							"move_east": None,
-							"pause": None,
-							"console_submit": self._io_console_submit,
-							"console_input": None,
-							"_echo": self._io_console_echo}
+				self._controls = {	"move_north": None,
+									"move_west": None,
+									"move_south": None,
+									"move_east": None,
+									"pause": None,
+									"console_submit": self._io_console_submit,
+									"console_input": None,
+									"_echo": self._io_console_echo}
 
-        def _do_action(self, mob, action):
-                """Change state based on which action is performed by what mob."""
+	def _do_action(self, mob, action):
+		"""Change state based on which action is performed by what mob."""
 
-                # *** DEBUG ***
-                path = _path_from_id(action)
-                action_file = open(path, 'r')
-                exec(action_file.read())
-                # *** DEBUG ***
-                pass
+		# *** DEBUG ***
+		path = _path_from_id(action)
+		action_file = open(path, 'r')
+		exec(action_file.read())
+		# *** DEBUG ***
+		pass
 
 	def _io_console_echo(self, char):
 		"""Deal with with echo character input."""
@@ -311,9 +319,9 @@ class Game(object):
 	def _io_pause(self):
 		"""Pause the game, also known as quit the game (for now)"""
 
-                # *** DEBUG ***
+		# *** DEBUG ***
 		self._app.stop()
-                # *** DEBUG ***
+		# *** DEBUG ***
 
 	def _mod_change_index(self, index, to_value):
 		"""Change self._state.index safely."""
@@ -406,19 +414,19 @@ class Game(object):
 
 		mob.next_turn = action
 
-        def _turn(self):
-                """Execute the actions of a turn"""
+	def _turn(self):
+		"""Execute the actions of a turn"""
 
-                # Execute all of the actions
-                for mob in self._state.map.get_mobs():
+		# Execute all of the actions
+		for mob in self._state.map.get_mobs():
 
-                        self._do_action(mob, mob.next_turn)
+			self._do_action(mob, mob.next_turn)
 
-                # Reset/decide the actions for all the next turns
-                for mob in self._state.map.get_mobs():
+		# Reset/decide the actions for all the next turns
+		for mob in self._state.map.get_mobs():
 
-                        ai_type = mob.ai.split(':')[-1]
-                        mob.next_turn = ai[ai_type].DefAI.get_next_turn(mob)
+			ai_type = mob.ai.split(':')[-1]
+			self._mod_set_next_turn(mob, ai[ai_type].DefAI.get_next_turn(self._state.map, mob))
 
 	def eval_control_string(self, string):
 		"""
@@ -453,84 +461,106 @@ class Game(object):
 	def loop(self):
 		"""Perform a main game loop."""
 
-                will_do_turn = True
+		will_do_turn = True
 
 		for mob in self._state.map.get_mobs():
-                        if mob.next_turn == None:
+			if mob.next_turn == None:
 
-                                will_do_turn = False
+				will_do_turn = False
 
-                if will_do_turn:
+		if will_do_turn:
 
-                        self._turn()
+			self._turn()
 
 class State(object):
 	"""
 	The class which contains all the in-game information necessary to take a snapshot
 
-	State.__init__(self, saved_state)
+	State.__init__(self, saved_state=None)
+	State.__repr__(self)
 	State.__str__(self)
+	State.to_dict(self)
 
 	State.map
 	State.message_log
 	State.index
 	"""
 
-	def __init__(self, saved_state):
+	def __init__(self, saved_state=None):
 		"""
-                Initialize the State from a save.
+		Initialize the State from a save.
 
-                Member variables have free reign to edit saved_state.
-                """
+		Member variables have free reign to edit saved_state.
+		"""
 
-		# Load from the saved state
-		self.map = Map(saved_state["map"])
-		self.message_log = saved_state["message_log"]
-		
-		# Load index
-		self.index = saved_state["index"]
+		if saved_state:
 
-		if saved_state["index"][0] == VIEW_MAP or saved_state["index"][0] == VIEW_DC:
+			# Load from the saved state
+			self.map = load_from_dict(saved_state["map"])
+			self.message_log = saved_state["message_log"]
+			
+			# Load index
+			self.index = saved_state["index"]
 
-			mob_loc_x = saved_state["index"][1][0][0]
-			mob_loc_y = saved_state["index"][1][0][1]
-			mob_layer = saved_state["index"][1][0][2]
-			mob_permeability = saved_state["index"][1][1]
+			if saved_state["index"][0] == VIEW_MAP or saved_state["index"][0] == VIEW_DC:
 
-			tile = self.map.grid[mob_loc_x][mob_loc_y]
-			layer = tile.layers[mob_layer]
-			mob = layer[mob_permeability]
+				mob_loc_x = saved_state["index"][1][0][0]
+				mob_loc_y = saved_state["index"][1][0][1]
+				mob_layer = saved_state["index"][1][0][2]
+				mob_permeability = saved_state["index"][1][1]
 
-			self.index[1] = mob
+				tile = self.map.grid[mob_loc_x][mob_loc_y]
+				layer = tile.layers[mob_layer]
+				mob = layer[mob_permeability]
+
+				self.index[1] = mob
+
+	def __repr__(self):
+		"""Return a syntactically correct string representation of the State based off of to_dict."""
+
+		return repr(self.to_dict())
 
 	def __str__(self):
-		"""Create a string representation used for saving."""
+		"""Return a string representation of the State based off of to_dict."""
 
-		# Check if index[1] is a mob and then fix it if necessary
+		return json.dumps(self.to_dict())
+
+	def to_dict(self):
+		"""Create a JSON-serializable dict representation of the State."""
+
+		state = {}
+
+		# Fix index[1] if necessary
+		saved_index = copy.copy(self.index)
+
 		if type(self.index[1]) == Mob:
-
-			saved_index = copy.copy(self.index)
 
 			saved_index[1] = [self.index[1].coords, self.index[1].permeability]
 
-		# Construct the state and return
-		state = {"map": json_loads_str(str(self.map)), "index": saved_index, "message_log": self.message_log}
+		# Construct state
+		state["_type"] = "State"
+		state["index"] = saved_index
+		state["map"] = self.map.to_dict()
+		state["message_log"] = self.message_log
 
-		return json.dumps(state)
+		# Return state
+		return state
 
 class Map(object):
 	"""
 	The class which contains a grid of tiles
 
-	Map.__init__(self, saved_state)
+	Map.__init__(self, saved_state=None)
+	Map.__repr__(self)
 	Map.__str__(self)
-        Map.get_mobs(self)
+	Map.get_mobs(self)
+	Map.to_dict(self)
 
 	Map._size
 	Map.grid
 	"""
 
-	def __init__(self, saved_state):
+	def __init__(self, saved_state=None):
 		"""Initialize the Map from a saved state."""
 
 		# Load from the saved state
@@ -547,12 +577,36 @@ class Map(object):
 			for y_val in range(len(saved_col)):
 
 				saved_tile = saved_state["grid"][x_val][y_val]
-				col.append(Tile(saved_tile, [x_val, y_val]))
+				col.append(load_from_dict(saved_tile, [x_val, y_val]))
 
 			self.grid.append(col)
 
+	def __repr__(self):
+		"""Return a syntactically correct string representation of the Map based off of to_dict."""
+
+		return repr(self.to_dict())
+
 	def __str__(self):
-		"""Create a string representation used for saving."""
+		"""Return a string representation of the Map based off of to_dict."""
+
+		return json.dumps(self.to_dict())
+
+	def get_mobs(self):
+		"""Return all the mobs in the Map."""
+
+		mob_list = []
+
+		for col in self.grid:
+			for tile in col:
+
+				mob_list.extend(tile.get_mobs())
+
+		return mob_list
+
+	def to_dict(self):
+		"""Create a JSON-serializable dict representation of the Map."""
+
+		state = {}
 
 		# Fix grid
 		saved_grid = []
@@ -563,111 +617,113 @@ class Map(object):
 
 			for tile in col:
 
-				saved_col.append(json_loads_str(str(tile)))
+				saved_col.append(tile.to_dict())
 
 			saved_grid.append(saved_col)
 
-		# Construct the state and return
-		state = {"size": self._size, "grid": saved_grid}
+		# Construct state
+		state["_type"] = "Map"
+		state["grid"] = saved_grid
+		state["size"] = self._size
 
-		return json.dumps(state)
-
-	def get_mobs(self):
-                """Return all the mobs in the map."""
-
-                mob_list = []
-
-                for col in self.grid:
-                        for tile in col:
-
-                                mob_list.extend(tile.get_mobs())
-
-                return mob_list
+		# Return state
+		return state
 
 class Tile(object):
 	"""
 	A tile on the map, potentially containing many entities
 
-	Tile.__init__(self, saved_state, coords)
+	Tile.__init__(self, coords = [-1, -1], saved_state=None)
+	Tile.__repr__(self)
 	Tile.__str__(self)
-        Tile.get_mobs(self)
+	Tile.get_mobs(self)
+	Tile.to_dict(self)
 
 	Tile.coords
 	Tile.layers
 	"""
 
-	def __init__(self, saved_state, coords):
-		"""Load the Tile from a saved state."""
+	def __init__(self, coords=[-1, -1], saved_state=None):
+		"""Initialize the Tile, perhaps from a saved state."""
 
-		# Set coords
+		if saved_state:
+
+			# Loading from a saved_state dict
+			# Construct layers
+			self.layers = []
+
+			saved_layers_list = saved_state["layers"]
+
+			for saved_layer_dict in saved_layers_list:
+
+				layer = {}
+
+				for key in saved_layer_dict:
+
+					entity_coords = copy.copy(coords)
+					entity_coords.append(int(key))
+
+					layer[int(key)] = load_from_dict(saved_layer_dict[key], entity_coords)
+
+				self.layers.append(layer)
+
+		else:
+
+			pass
+
 		self.coords = coords
 
-		# Reconstruct layers and entites
-		self.layers = []
-		layers_list = saved_state["layers"]
+	def __repr__(self):
+		"""Return a syntactically correct string representation of the Tile based off of to_dict."""
 
-		for layer_dict in layers_list:
+		return repr(self.to_dict())
 
-			layer = {}
-
-			for key in layer_dict:
-
-				entity_coords = copy.copy(coords)
-				entity_coords.append(int(key))
-
-				if layer_dict[key][0] == "mob":
-
-					layer[int(key)] = Mob(layer_dict[key][1], entity_coords)
-
-				elif layer_dict[key][0] == "nonmob":
-
-					layer[int(key)] = NonMob(layer_dict[key][1], entity_coords)
-
-			self.layers.append(layer)
-		
 	def __str__(self):
+		"""Return a string representation of the Tile based off of to_dict."""
+
+		return json.dumps(self.to_dict())
+
+	def get_mobs(self):
+		"""Get all the mobs in the tile"""
+
+		mob_list = []
+
+		for layer in self.layers:
+			for permeability in layer.keys():
+				if type(layer[permeability]) == Mob:
+
+					mob_list.append(layer[permeability])
+
+		return mob_list
+
+	def to_dict(self):
 		"""
-		Create a string representation used for saving.
+		Create a JSON-serializable dict representation of the Tile.
 
 		self.coords is not saved because it is a soft reference.
 		"""
 
+		state = {}
+
 		# Fix layers
-		layers_list = []
+		saved_layers = []
 
 		for layer in self.layers:
 
-			layer_dict = {}
+			saved_layer_dict = {}
 
 			for key in layer:
-				# Check if it's a Mob or NonMob
-				if type(layer[key]) == Mob:
+				
+				saved_layer_dict[str(key)] = layer[key].to_dict()
 
-					layer_dict[key] = ["mob", json_loads_str(str(layer[key]))]
+			saved_layers.append(saved_layer_dict)
 
-				elif type(layer[key]) == NonMob:
+		# Construct state
+		state["_type"] = "Tile"
+		state["layers"] = saved_layers
 
-					layer_dict[key] = ["nonmob", json_loads_str(str(layer[key]))]
-
-			layers_list.append(layer_dict)
-
-		# Construct the state and return
-		state = {"layers": layers_list}
-
-		return json.dumps(state)
-
-	def get_mobs(self):
-                """Get all the mobs in the tile"""
-
-                mob_list = []
-
-                for layer in self.layers:
-                        for permeability in layer.keys():
-                                if type(layer[permeability]) == Mob:
-
-                                        mob_list.append(layer[permeability])
-
-                return mob_list
+		# Return state
+		return state
 
 class Entity(object):
 	"""
@@ -675,54 +731,93 @@ class Entity(object):
 
 	Higher permeability means it's more similar to a vaccuum.
 
-	Entity.__init__(self, saved_state, coords)
+	Entity.__init__(self, coords=[-1, -1, -1], saved_state=None)
+	Entity.__repr__(self)
 	Entity.__str__(self)
+	Entity.to_dict(self)
 
 	Entity.coords
 	Entity.id
 	Entity.permeability
 	"""
 
-	def __init__(self, saved_state, coords):
-		"""Load the Entity from a saved state dict."""
+	def __init__(self, coords=[-1, -1, -1], saved_state=None):
+		"""Initialize the Entity, perhaps from a saved state."""
 
-		# Reconstruct
+		if saved_state:
+
+			# Loading from a saved_state dict
+			self.id = saved_state["id"]
+			self.permeability = saved_state["permeability"]
+
+		else:
+
+			pass
+
 		self.coords = coords
-		self.id = saved_state["id"]
-		self.permeability = saved_state["permeability"]
+
+	def __repr__(self):
+		"""Return a syntactically correct string representation of the Entity based off of to_dict."""
+
+		return repr(self.to_dict())
 
 	def __str__(self):
+		"""Return a string representation of the Entity based off of to_dict."""
+
+		return json.dumps(self.to_dict())
+
+	def to_dict(self):
 		"""
-		Create a string representation used for saving.
+		Create a JSON-serializable dict representation of the Entity.
 
 		self.coords is a soft reference, so it is not saved.
 		"""
 
-		state = {"id": self.id, "permeability": self.permeability}
+		state = {}
 
-		return json.dumps(state)
+		# Construct state
+		state["_type"] = "Entity"
+		state["id"] = self.id
+		state["permeability"] = self.permeability
+
+		# Return state
+		return state
 
 class NonMob(Entity):
 	"""
 	An entity wihout an AI
 
-	NonMob.__init__(self, saved_state, coords)
+	NonMob.__init__(self, coords=[-1, -1, -1], saved_state=None)
+	NonMob.to_dict(self)
 
 	Also includes some member variables from Entity
 	"""
 
-	def __init__(self, saved_state, coords):
-		"""Create a NonMob from a saved state."""
+	def __init__(self, coords=[-1, -1, -1], saved_state=None):
+		"""Initialize the NonMob, perhaps from a saved state."""
 
-		super(NonMob, self).__init__(saved_state, coords)
+		super(NonMob, self).__init__(coords, saved_state)
+
+	def to_dict(self):
+		"""Create a JSON-serializable dict representation of the NonMob."""
+
+		state = super(NonMob, self).to_dict()
+
+		# Construct state
+		state["_type"] = "NonMob"
+
+		# Return state
+		return state
 
 class Mob(Entity):
 	"""
 	An entity with an AI
 
-	Mob.__init__(self, saved_state, coords)
+	Mob.__init__(self, coords=[-1, -1, -1], saved_state=None)
+	Mob.__repr__(self)
 	Mob.__str__(self)
 	Mob.get_actions(self)
+	Mob.to_dict(self)
 
 	Mob._actions
 	Mob.ai
@@ -731,42 +826,193 @@ class Mob(Entity):
 	Also includes some member variables from Entity
 	"""
 
-	def __init__(self, saved_state, coords):
-		"""
-		Create a Mob from a saved state.
+	def __init__(self, coords=[-1, -1, -1], saved_state=None):
+		"""Initialize the Mob, perhaps from a saved state."""
 
-		You might want to send saved_state as a deepcopy, as it is modified
-		"""
+		super(Mob, self).__init__(coords, saved_state)
 
-		# Restore Mob-only variables by popping
-		self._actions = saved_state.pop("actions")
-		self.ai = saved_state.pop("ai")
-		self.next_turn = saved_state.pop("next_turn")
+		if saved_state:
 
-		# Do super.__init__ with the non-Mob-only variables
-		super(Mob, self).__init__(saved_state, coords)
+			# Loading from a saved_state dict
+			self._actions = saved_state["actions"]
+			self.ai = saved_state["ai"]
+			self.next_turn = saved_state["next_turn"]
+
+		else:
+
+			pass
+
+	def __repr__(self):
+		"""Return a syntactically correct string representation of the Mob based off of to_dict."""
+
+		return repr(self.to_dict())
 
 	def __str__(self):
-		"""
-		Create a string representation used for saving.
+		"""Return a string representation of the Mob based off of to_dict."""
 
-		self.coords is a soft reference, so it is not saved.
-		"""
-
-		state = {       "id": self.id, "permeability": self.permeability,
-				"ai": self.ai, "next_turn": self.next_turn,
-				"actions": self._actions}
-
-		return json.dumps(state)
+		return json.dumps(self.to_dict())
 
 	def get_actions(self):
-                """Return the mob's actions."""
+		"""Return the mob's actions."""
 
-                return self._actions
+		return self._actions
+
+	def to_dict(self):
+		"""Create a JSON-serializable dict representation of the Mob."""
+
+		state = super(Mob, self).to_dict()
+
+		# Construct state
+		state["_type"] = "Mob"
+		state["actions"] = self._actions
+		state["ai"] = self.ai
+		state["next_turn"] = self.next_turn
+
+		# Return state
+		return state
+
+class Coagulate(object):
+	"""
+	The unit of inventory organization; it's effectively a fun list.
+	Everything in a Coagulate must be either of the type Differentia or Coagulate.
+
+	Coagulate.__getitem__(self, index)
+	Coagulate.__init__(self, name="", tree=[], saved_state=None)
+	Coagulate.__repr__(self)
+	Coagulate.__str__(self)
+	Coagulate.to_dict(self)
+
+	Coagulate._tree
+	Coagulate.name
+	"""
+
+	def __getitem__(self, index):
+		"""Get the item from Coagulate._tree at index."""
+
+		return self._tree[index]
+
+	def __init__(self, name="", tree=[], saved_state=None):
+		"""
+		Initialize the Coagulate, perhaps from a saved state.
+
+		It does not use load_from_dict() on anything not in saved_state
+		"""
+
+		if saved_state:
+
+			# Loading from a saved_state dict
+			self.name = saved_state["name"]
+
+			# Construct tree
+			self._tree = []
+
+			for differentia in saved_state["tree"]:
+
+				self._tree.append(load_from_dict(differentia))
+
+		else:
+
+			self._tree = tree
+			self.name = name
+
+	def __repr__(self):
+		"""Return a syntactically correct string representation of the Coagulate based off of to_dict."""
+
+		return repr(self.to_dict())
+
+	def __str__(self):
+		"""Return a string representation of the Coagulate based off of to_dict."""
+
+		return json.dumps(self.to_dict())
+
+	def to_dict(self):
+		"""Create a JSON-serializable dict representation of the Coagulate."""
+
+		state = {}
+
+		# Fix tree
+		saved_tree = []
+
+		for differentia in self._tree:
+
+			saved_tree.append(differentia.to_dict())
+
+		# Construct state
+		state["_type"] = "Coagulate"
+		state["tree"] = saved_tree
+		state["name"] = self.name
+
+		# Return state
+		return state
+
+class Differentia(object):
+	"""
+	Anything which goes inside of a coagulate.
+	
+	Differentia.__getitem__(self, index)
+	Differentia.__init__(self, name="", method=lambda: None, saved_state=None)
+	Differentia.__repr__(self)
+	Differentia.__str__(self)
+	Differentia.to_dict(self)
+
+	Differentia.method
+	Differentia.name
+	"""
+
+	def __getitem__(self, index):
+		"""Get the item from Differentia.method at index."""
+
+		return self.method[index]
+
+	def __init__(self, name="", method=lambda: None, saved_state=None):
+		"""Initialize the Differentia, perhaps from a saved state."""
+
+		if saved_state:
+
+			# Loading from a saved_state dict
+			self.method = load_from_dict(saved_state["method"])
+			self.name = saved_state["name"]
+
+		else:
+
+			self.name = name
+			self.method = method
+
+	def __repr__(self):
+		"""Return a syntactically correct string representation of the Differentia based off of to_dict."""
+
+		return repr(self.to_dict())
+
+	def __str__(self):
+		"""Return a string representation of the Differentia based off of to_dict."""
+
+		return json.dumps(self.to_dict())
+
+	def to_dict(self):
+		"""Create a JSON-serializable dict representation of the Differentia."""
+
+		state = {}
+
+		# Construct state
+		state["_type"] = "Differentia"
+		state["method"] = self.method.to_dict()
+		state["name"] = self.name
+
+		# Return state
+		return state
 
 # Functions
-
 def _path_from_id(id_):
 	"""Get a path to a file based on its ID."""
 
 	return os.path.join(os.path.dirname(__file__), *id_.split(':'))
+
+def load_from_dict(saved_state, *args):
+	"""
+	Load an instance from a dict with the "_type" key.
+
+	Should this use copy.copy()?
+	Meanwhile while I'm not using copy.copy(), it's __init__'s job to not damage saved_state.
+	"""
+
+	return globals()[saved_state["_type"]](saved_state=saved_state, *args)
