@@ -375,11 +375,10 @@ class Game(object):
 		"""Step into a Coagulate or run a Game.co_* method."""
 
 		# The referenced Differentia has nothing below it, so call method
-	 	if type(self._deref_index(self._state.index)) == Differentia:
-			if callable(self._deref_index(self._state.index).method):
+	 	if not len(self._deref_index(self._state.index)):
 
-				self._deref_index(self._state.index).method.__call__(self)
-				return
+			self._deref_index(self._state.index).method.__call__(self)
+			return
 
 		# There's still options to choose from below you, so step in.
 		new_index = copy.copy(self._state.index)
@@ -944,6 +943,21 @@ class Entity(object):
 			pass
 
 		self.coords = coords
+		# *** DEBUG ***
+		self.dif_coag = Coagulate(	tree=[	Coagulate(name="Inventory"),
+											Coagulate(name="Status"),
+											Coagulate(name="Knowledge")],
+									is_root=True)
+		self.inventory = self.dif_coag[0]
+		self.status = self.dif_coag[1]
+		self.knowledge = self.dif_coag[2]
+
+		no_op = Differentia(name="No-op")
+
+		self.inventory.append(copy.copy(no_op))
+		self.status.append(copy.copy(no_op))
+		self.knowledge.append(copy.copy(no_op))
+		# *** DEBUG ***
 
 	def __repr__(self):
 		"""Return a syntactically correct string representation of the Entity based off of to_dict."""
@@ -1070,11 +1084,12 @@ class Coagulate(object):
 	Coagulate.__len__(self)
 	Coagulate.__repr__(self)
 	Coagulate.__str__(self)
+	Coagulate.append(self, coag_or_dif)
 	Coagulate.to_dict(self)
 
 	Coagulate._tree
-	Coagulate.name
 	Coagulate.is_root
+	Coagulate.name
 	"""
 
 	def __getitem__(self, index):
@@ -1098,9 +1113,9 @@ class Coagulate(object):
 			# Construct tree
 			self._tree = []
 
-			for differentia in saved_state["tree"]:
+			for coag_or_dif in saved_state["tree"]:
 
-				self._tree.append(load_from_dict(differentia))
+				self._tree.append(load_from_dict(coag_or_dif))
 
 		else:
 
@@ -1122,6 +1137,11 @@ class Coagulate(object):
 		"""Return a string representation of the Coagulate based off of to_dict."""
 
 		return json.dumps(self.to_dict(), indent=4, separators=(",", ": "), sort_keys=True)
+
+	def append(self, coag_or_dif):
+		"""Add something to the Coagualte."""
+
+		self._tree.append(coag_or_dif)
 
 	def to_dict(self):
 		"""
@@ -1148,85 +1168,40 @@ class Coagulate(object):
 		# Return state
 		return state
 
-class Differentia(object):
+class Differentia(Coagulate):
 	"""
 	Anything which goes inside of a coagulate.
 	
-	Differentia.__getitem__(self, index)
-	Differentia.__init__(self, name="", method=lambda: None, saved_state=None)
-	Differentia.__len__(self)
-	Differentia.__repr__(self)
-	Differentia.__str__(self)
+	__init__(self, name="", tree=[], method=Game.co_pass, is_root=False, saved_state=None)
 	Differentia.to_dict(self)
 
 	Differentia.method
-	Differentia.name
-	Differentia.is_root
+
+	Also includes some member variables from Coagulate.
 	"""
 
-	def __getitem__(self, index):
-		"""Get the item from Differentia.method at index."""
-
-		return self.method[index]
-
-	def __len__(self):
-		"""Get the length of self.method assuming it's a list."""
-		
-		return len(self.method)
-
-	def __init__(self, name="", method=Game.co_pass, is_root=False, saved_state=None):
+	def __init__(self, name="", tree=[], method=Game.co_pass, is_root=False, saved_state=None):
 		"""Initialize the Differentia, perhaps from a saved state."""
+
+		super(Differentia, self).__init__(name, tree, is_root, saved_state)
 
 		if saved_state:
 
 			# Loading from a saved_state dict
-			self.name = saved_state["name"]
-			self.is_root = saved_state["is_root"]
-
-			# Construct method
-			if type(saved_state["method"]) == str:
-
-				self.method = Game.__dict__[saved_state["method"]]
-
-			else:
-
-				self.method = load_from_dict(saved_state["method"])
+			self.method = Game.__dict__[saved_state["method"]]
 
 		else:
 
-			self.name = name
 			self.method = method
-			self.is_root = is_root
-
-	def __repr__(self):
-		"""Return a syntactically correct string representation of the Differentia based off of to_dict."""
-
-		return repr(self.to_dict())
-
-	def __str__(self):
-		"""Return a string representation of the Differentia based off of to_dict."""
-
-		return json.dumps(self.to_dict(), indent=4, separators=(",", ": "), sort_keys=True)
 
 	def to_dict(self):
 		"""Create a JSON-serializable dict representation of the Differentia."""
 
-		state = {}
-
-		# Fix method
-		if callable(self.method):
-
-			saved_method = self.method.__name__
-
-		else:
-
-			saved_method = self.method.to_dict()
+		state = super(Differentia, self).to_dict()
 
 		# Construct state
 		state["_type"] = "Differentia"
-		state["method"] = saved_method
-		state["name"] = self.name
-		state["is_root"] = self.is_root
+		state["method"] = self.method.__name__
 
 		# Return state
 		return state
