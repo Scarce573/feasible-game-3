@@ -175,7 +175,7 @@ class Game(object):
 	Game._act_move(self, mob, direction)
 	Game._build_controls(self)
 	Game._deref_index(self)
-	Game._do_action(self, mob, alass Differentia(objectction)
+	Game._do_action(self, mob, action)
 	Game._io_coag_back(self)
 	Game._io_coag_next(self)
 	Game._io_coag_prev(self)
@@ -183,6 +183,7 @@ class Game(object):
 	Game._io_console_echo(self, char)
 	Game._io_console_input(self)
 	Game._io_console_submit(self)
+	Game._io_menu(self)
 	Game._io_move_north(self)
 	Game._io_move_west(self)
 	Game._io_move_south(self)
@@ -255,18 +256,19 @@ class Game(object):
 		"""
 
 		# The coagulate controls
-		coagulate_controls = {	"coag_back": self._io_coag_back,
+		coagulate_controls = {	"_echo": None,
+								"coag_back": self._io_coag_back,
 								"coag_next": self._io_coag_next,
 								"coag_prev": self._io_coag_prev,
 								"coag_select": self._io_coag_select,
+								"console_submit": None,
+								"console_input": None,
+								"menu": None,
 								"move_north": None,
 								"move_west": None,
 								"move_south": None,
 								"move_east": None,
-								"pause": None,
-								"console_submit": None,
-								"console_input": None,
-								"_echo": None}
+								"pause": None}
 
 		# The controls for the map view
 		if self._state.index[0] == VIEW_MAP:
@@ -274,34 +276,41 @@ class Game(object):
 			# You're interacting with the map
 			if self._state.index[2] == FOCUS_MAP:
 
-				self._controls = {	"coag_back": None,
+				self._controls = {	"_echo": None,
+									"coag_back": None,
 									"coag_next": None,
 									"coag_prev": None,
 									"coag_select": None,
+									"console_submit": None,
+									"console_input": self._io_console_input,
+									"menu": self._io_menu,
 									"move_north": self._io_move_north,
 									"move_west": self._io_move_west,
 									"move_south": self._io_move_south,
 									"move_east": self._io_move_east,
-									"pause": self._io_pause,
-									"console_submit": None,
-									"console_input": self._io_console_input,
-									"_echo": None}
+									"pause": self._io_pause}
 
 			# You're interacting with the conosle
 			elif self._state.index[2] == FOCUS_CONSOLE:
 
-				self._controls = {	"coag_back": None,
+				self._controls = {	"_echo": self._io_console_echo,
+									"coag_back": None,
 									"coag_next": None,
 									"coag_prev": None,
 									"coag_select": None,
+									"console_submit": self._io_console_submit,
+									"console_input": None,
+									"menu": None,
 									"move_north": None,
 									"move_west": None,
 									"move_south": None,
 									"move_east": None,
-									"pause": None,
-									"console_submit": self._io_console_submit,
-									"console_input": None,
-									"_echo": self._io_console_echo}
+									"pause": None}
+
+		# The controls for DC view
+		elif  self._state.index[0] == VIEW_DC:
+
+			self._controls = coagulate_controls
 
 		# The controls for pause view
 		elif self._state.index[0] == VIEW_PAUSE:
@@ -317,23 +326,23 @@ class Game(object):
 
 		if index[0] == VIEW_MAP or index[0] == VIEW_DC:
 			
-			coag_or_dif = index[1].dif_coag
+			coag = index[1].dif_coag
 
 			for sub_index in index[2:]:
 
-				coag_or_dif = coag_or_dif[sub_index]
+				coag = coag[sub_index]
 
-			return coag_or_dif
+			return coag
 
 		elif index[0] == VIEW_PAUSE:
 
-			coag_or_dif = self._state.pause_coag
+			coag = self._state.pause_coag
 
 			for sub_index in index[1:]:
 
-				coag_or_dif = coag_or_dif[sub_index]
+				coag = coag[sub_index]
 
-			return coag_or_dif
+			return coag
 
 	def _do_action(self, mob, action):
 		"""Change state based on which action is performed by what mob."""
@@ -402,6 +411,14 @@ class Game(object):
 
 		self._mod_change_index(2, FOCUS_MAP)
 		self._mod_console_run_message()
+
+	def _io_menu(self):
+		"""Go to the E-menu."""
+
+		self._mod_change_index(	to_value=[VIEW_DC, self._state.index[1], 0], 
+								set_all=True, 
+								stored_index=True)
+		self._mod_toggle_index()
 
 	def _io_move_north(self):
 		"""Prepare to move the player character north."""
@@ -693,8 +710,8 @@ class State(object):
 
 				self.stored_index[1] = mob
 
-		self.pause_coag = Coagulate(tree=[	Differentia(name="Quit", method=Game.co_quit),
-											Differentia(name="Resume", method=Game.co_resume)],
+		self.pause_coag = Coagulate(tree=[	Nub(name="Quit", method=Game.co_quit),
+											Nub(name="Resume", method=Game.co_resume)],
 									is_root=True)
 
 	def __repr__(self):
@@ -821,7 +838,7 @@ class Tile(object):
 	"""
 	A tile on the map, potentially containing many entities
 
-	Tile.__init__(self, coords = [-1, -1], saved_state=None)
+	Tile.__init__(self, coords=(-1, -1), saved_state=None)
 	Tile.__repr__(self)
 	Tile.__str__(self)
 	Tile.get_mobs(self)
@@ -831,7 +848,7 @@ class Tile(object):
 	Tile.layers
 	"""
 
-	def __init__(self, coords=[-1, -1], saved_state=None):
+	def __init__(self, coords=(-1, -1), saved_state=None):
 		"""Initialize the Tile, perhaps from a saved state."""
 
 		if saved_state:
@@ -919,17 +936,62 @@ class Entity(object):
 
 	Higher permeability means it's more similar to a vaccuum.
 
-	Entity.__init__(self, coords=[-1, -1, -1], saved_state=None)
+	Entity.__getattr__(self, attr)
+	Entity.__init__(self, coords=(-1, -1, -1), saved_state=None)
 	Entity.__repr__(self)
 	Entity.__str__(self)
 	Entity.to_dict(self)
 
+	Entity.actions
 	Entity.coords
+	Entity.characteristics
+	Entity.dif_coag
 	Entity.id
+	Entity.inventory
+	Entity.knowledge
 	Entity.permeability
+	Entity.status
 	"""
 
-	def __init__(self, coords=[-1, -1, -1], saved_state=None):
+	def __getattr__(self, attr):
+		"""Get an attribute, but do a special behavior with dif_coag."""
+
+		if attr == "actions":
+
+			actions = None
+			# *** DEBUG ***
+			actions = Coagulate(name="Actions", tree=[])
+			no_op = Action(name="No-op Action", id_="no-op")
+			actions.append(no_op)
+			# *** DEBUG ***
+			return actions
+
+		elif attr == "characteristics":
+
+			characteristics = None
+			# *** DEBUG ***
+			characteristics = Coagulate(name="Characteristics", tree=[])
+			qualita = Coagulate(name="Qualita", tree=[Qualita(name="No-op Qualita", id_="no=op")])
+			quanta = Coagulate(name="Quanta", tree=[Quanta(name="No-op Quanta", id_="no=op")])
+			characteristics.append(qualita)
+			characteristics.append(quanta)
+			# *** DEBUG ***
+			return characteristics
+
+		elif attr == "dif_coag":
+
+			return Coagulate(tree=[	self.inventory,
+									self.status,
+									self.knowledge,
+									self.characteristics,
+									self.actions],
+							is_root=True)		
+
+		else:
+
+			return object.__getattr__(self, attr)
+
+	def __init__(self, coords=(-1, -1, -1), saved_state=None):
 		"""Initialize the Entity, perhaps from a saved state."""
 
 		if saved_state:
@@ -944,19 +1006,17 @@ class Entity(object):
 
 		self.coords = coords
 		# *** DEBUG ***
-		self.dif_coag = Coagulate(	tree=[	Coagulate(name="Inventory"),
-											Coagulate(name="Status"),
-											Coagulate(name="Knowledge")],
-									is_root=True)
-		self.inventory = self.dif_coag[0]
-		self.status = self.dif_coag[1]
-		self.knowledge = self.dif_coag[2]
+		self.inventory = Coagulate(name="Inventory", tree=[])
+		self.status = Coagulate(name="Status", tree=[])
+		self.knowledge = Coagulate(name="Knowledge", tree=[])
 
-		no_op = Differentia(name="No-op")
+		sword = Item(name="Sword", id_="default:item:sword")
+		human =  Status(name="Human", id_="default:status:human")
+		fireball = Concept(name="Fireball", id_="default:concept:fireball")
 
-		self.inventory.append(copy.copy(no_op))
-		self.status.append(copy.copy(no_op))
-		self.knowledge.append(copy.copy(no_op))
+		self.inventory.append(copy.deepcopy(sword))
+		self.status.append(copy.deepcopy(human))
+		self.knowledge.append(copy.deepcopy(fireball))
 		# *** DEBUG ***
 
 	def __repr__(self):
@@ -990,13 +1050,13 @@ class NonMob(Entity):
 	"""
 	An entity wihout an AI
 
-	NonMob.__init__(self, coords=[-1, -1, -1], saved_state=None)
+	NonMob.__init__(self, coords=(-1, -1, -1), saved_state=None)
 	NonMob.to_dict(self)
 
 	Also includes some member variables from Entity
 	"""
 
-	def __init__(self, coords=[-1, -1, -1], saved_state=None):
+	def __init__(self, coords=(-1, -1, -1), saved_state=None):
 		"""Initialize the NonMob, perhaps from a saved state."""
 
 		super(NonMob, self).__init__(coords, saved_state)
@@ -1016,9 +1076,7 @@ class Mob(Entity):
 	"""
 	An entity with an AI
 
-	Mob.__init__(self, coords=[-1, -1, -1], saved_state=None)
-	Mob.__repr__(self)
-	Mob.__str__(self)
+	Mob.__init__(self, coords=(-1, -1, -1), saved_state=None)
 	Mob.get_actions(self)
 	Mob.to_dict(self)
 
@@ -1029,7 +1087,7 @@ class Mob(Entity):
 	Also includes some member variables from Entity
 	"""
 
-	def __init__(self, coords=[-1, -1, -1], saved_state=None):
+	def __init__(self, coords=(-1, -1, -1), saved_state=None):
 		"""Initialize the Mob, perhaps from a saved state."""
 
 		super(Mob, self).__init__(coords, saved_state)
@@ -1044,16 +1102,6 @@ class Mob(Entity):
 		else:
 
 			pass
-
-	def __repr__(self):
-		"""Return a syntactically correct string representation of the Mob based off of to_dict."""
-
-		return repr(self.to_dict())
-
-	def __str__(self):
-		"""Return a string representation of the Mob based off of to_dict."""
-
-		return json.dumps(self.to_dict(), indent=4, separators=(",", ": "), sort_keys=True)
 
 	def get_actions(self):
 		"""Return the mob's actions."""
@@ -1080,11 +1128,11 @@ class Coagulate(object):
 	Everything in a Coagulate must be either of the type Differentia or Coagulate.
 
 	Coagulate.__getitem__(self, index)
-	Coagulate.__init__(self, name="", tree=[], saved_state=None)
+	Coagulate.__init__(self, name="", tree=(), saved_state=None)
 	Coagulate.__len__(self)
 	Coagulate.__repr__(self)
 	Coagulate.__str__(self)
-	Coagulate.append(self, coag_or_dif)
+	Coagulate.append(self, coag)
 	Coagulate.to_dict(self)
 
 	Coagulate._tree
@@ -1095,9 +1143,28 @@ class Coagulate(object):
 	def __getitem__(self, index):
 		"""Get the item from Coagulate._tree at index."""
 
-		return self._tree[index]
+		if type(index) == int:
 
-	def __init__(self, name="", tree=[], is_root=False, saved_state=None):
+			return self._tree[index]
+
+		elif type(index) == str:
+			for coag in self._tree:
+				try:
+					if index == coag.id:
+
+						return coag
+
+				except AttributeError:
+
+					pass
+
+			raise KeyError(index)
+
+		else:
+
+			raise TypeError("Coagulate indecies/keys must be integers/strings, not " + str(type(index))) 
+
+	def __init__(self, name="", tree=(), is_root=False, saved_state=None):
 		"""
 		Initialize the Coagulate, perhaps from a saved state.
 
@@ -1113,9 +1180,9 @@ class Coagulate(object):
 			# Construct tree
 			self._tree = []
 
-			for coag_or_dif in saved_state["tree"]:
+			for coag in saved_state["tree"]:
 
-				self._tree.append(load_from_dict(coag_or_dif))
+				self._tree.append(load_from_dict(coag))
 
 		else:
 
@@ -1138,10 +1205,10 @@ class Coagulate(object):
 
 		return json.dumps(self.to_dict(), indent=4, separators=(",", ": "), sort_keys=True)
 
-	def append(self, coag_or_dif):
+	def append(self, coag):
 		"""Add something to the Coagualte."""
 
-		self._tree.append(coag_or_dif)
+		self._tree.append(coag)
 
 	def to_dict(self):
 		"""
@@ -1168,22 +1235,22 @@ class Coagulate(object):
 		# Return state
 		return state
 
-class Differentia(Coagulate):
+class Nub(Coagulate):
 	"""
-	Anything which goes inside of a coagulate.
+	A bit in a coagulate just made for running a method.
 	
-	__init__(self, name="", tree=[], method=Game.co_pass, is_root=False, saved_state=None)
-	Differentia.to_dict(self)
+	Nub.__init__(self, name="", method=Game.co_pass, saved_state=None)
+	Nub.to_dict(self)
 
-	Differentia.method
+	Nub.method
 
 	Also includes some member variables from Coagulate.
 	"""
 
-	def __init__(self, name="", tree=[], method=Game.co_pass, is_root=False, saved_state=None):
-		"""Initialize the Differentia, perhaps from a saved state."""
+	def __init__(self, name="", method=Game.co_pass, saved_state=None):
+		"""Initialize the Nub, perhaps from a saved state."""
 
-		super(Differentia, self).__init__(name, tree, is_root, saved_state)
+		super(Nub, self).__init__(name, (), False, saved_state)
 
 		if saved_state:
 
@@ -1195,13 +1262,223 @@ class Differentia(Coagulate):
 			self.method = method
 
 	def to_dict(self):
+		"""Create a JSON-serializable dict representation of the Nub."""
+
+		state = super(Nub, self).to_dict()
+
+		# Construct state
+		state["_type"] = "Nub"
+		state["method"] = self.method.__name__
+
+		# Return state
+		return state
+
+class Differentia(Coagulate):
+	"""
+	Any game element goes inside of a coagulate.
+	
+	__init__(self, name="", tree=(), id_="", method=Game.co_pass, is_root=False, saved_state=None)
+	Differentia.to_dict(self)
+
+	Differentia.id
+	Differentia.method
+
+	Also includes some member variables from Coagulate.
+	"""
+
+	def __init__(self, name="", tree=(), id_="", method=Game.co_pass, is_root=False, saved_state=None):
+		"""Initialize the Differentia, perhaps from a saved state."""
+
+		super(Differentia, self).__init__(name, tree, is_root, saved_state)
+
+		if saved_state:
+
+			# Loading from a saved_state dict
+			self.id = saved_state["id"]	
+			self.method = Game.__dict__[saved_state["method"]]
+
+		else:
+
+			self.id = id_
+			self.method = method
+
+	def to_dict(self):
 		"""Create a JSON-serializable dict representation of the Differentia."""
 
 		state = super(Differentia, self).to_dict()
 
 		# Construct state
 		state["_type"] = "Differentia"
+		state["id"] = self.id
 		state["method"] = self.method.__name__
+
+		# Return state
+		return state
+
+class Figment(Differentia):
+	"""
+	A figment of the game, such as an item, status, or concept.
+
+	Figment.__init__(self, name="", tree=(), id_="", method=Game.co_pass, is_root=False, saved_state=None)
+	Figment.to_dict(self)
+	"""
+
+	def __init__(self, name="", tree=(), id_="", method=Game.co_pass, is_root=False, saved_state=None):
+		"""Initialze the Figment, perhaps from a saved state."""
+
+		super(Figment, self).__init__(name, tree, id_, method, is_root, saved_state)
+
+	def to_dict(self):
+		"""Create a JSON-serializable dict representation of the Figment."""
+
+		state = super(Figment, self).to_dict()
+
+		# Return state
+		return state
+
+class Item(Figment):
+	"""
+	An item, something which can be picked up and dropped
+
+	Item.__init__(self, name="", tree=(), id_="", method=Game.co_pass, is_root=False, saved_state=None)
+	Item.to_dict(self)
+	"""
+
+	def __init__(self, name="", tree=(), id_="", method=Game.co_pass, is_root=False, saved_state=None):
+		"""Initialze the Item, perhaps from a saved state."""
+
+		super(Item, self).__init__(name, tree, id_, method, is_root, saved_state)
+
+	def to_dict(self):
+		"""Create a JSON-serializable dict representation of the Item."""
+
+		state = super(Item, self).to_dict()
+
+		# Return state
+		return state
+
+class Status(Figment):
+	"""
+	A physical descriptor of an entity
+
+	Status.__init__(self, name="", tree=(), id_="", method=Game.co_pass, is_root=False, saved_state=None)
+	Status.to_dict(self)
+	"""
+
+	def __init__(self, name="", tree=(), id_="", method=Game.co_pass, is_root=False, saved_state=None):
+		"""Initialze the Status, perhaps from a saved state."""
+
+		super(Status, self).__init__(name, tree, id_, method, is_root, saved_state)
+
+	def to_dict(self):
+		"""Create a JSON-serializable dict representation of the Status."""
+
+		state = super(Status, self).to_dict()
+
+		# Return state
+		return state
+
+class Concept(Figment):
+	"""
+	A non-physical descriptor of an entity.
+
+	Concept.__init__(self, name="", tree=(), id_="", method=Game.co_pass, is_root=False, saved_state=None)
+	Concept.to_dict(self)
+	"""
+
+	def __init__(self, name="", tree=(), id_="", method=Game.co_pass, is_root=False, saved_state=None):
+		"""Initialze the Concept, perhaps from a saved state."""
+
+		super(Concept, self).__init__(name, tree, id_, method, is_root, saved_state)
+
+	def to_dict(self):
+		"""Create a JSON-serializable dict representation of the Concept."""
+
+		state = super(Concept, self).to_dict()
+
+		# Return state
+		return state
+
+class Characteristic(Differentia):
+	"""
+	A single characteristic granted by a Figment
+
+	Characteristic.__init__(self, name="", tree=(), id_="", method=Game.co_pass, is_root=False, saved_state=None)
+	Characteristic.to_dict(self)
+	"""
+
+	def __init__(self, name="", tree=(), id_="", method=Game.co_pass, is_root=False, saved_state=None):
+		"""Initialze the Characteristic, perhaps from a saved state."""
+
+		super(Characteristic, self).__init__(name, tree, id_, method, is_root, saved_state)
+
+	def to_dict(self):
+		"""Create a JSON-serializable dict representation of the Characteristic."""
+
+		state = super(Characteristic, self).to_dict()
+
+		# Return state
+		return state
+
+class Qualita(Characteristic):
+	"""
+	A qualitative Characteristic
+
+	Qualita.__init__(self, name="", tree=(), id_="", method=Game.co_pass, is_root=False, saved_state=None)
+	Qualita.to_dict(self)
+	"""
+
+	def __init__(self, name="", tree=(), id_="", method=Game.co_pass, is_root=False, saved_state=None):
+		"""Initialze the Qualita, perhaps from a saved state."""
+
+		super(Qualita, self).__init__(name, tree, id_, method, is_root, saved_state)
+
+	def to_dict(self):
+		"""Create a JSON-serializable dict representation of the Qualita."""
+
+		state = super(Qualita, self).to_dict()
+
+		# Return state
+		return state
+
+class Quanta(Characteristic):
+	"""
+	A quantitative Characteristic
+
+	Quanta.__init__(self, name="", tree=(), id_="", method=Game.co_pass, is_root=False, saved_state=None)
+	Quanta.to_dict(self)
+	"""
+
+	def __init__(self, name="", tree=(), id_="", method=Game.co_pass, is_root=False, saved_state=None):
+		"""Initialze the Quanta, perhaps from a saved state."""
+
+		super(Quanta, self).__init__(name, tree, id_, method, is_root, saved_state)
+
+	def to_dict(self):
+		"""Create a JSON-serializable dict representation of the Quanta."""
+
+		state = super(Quanta, self).to_dict()
+
+		# Return state
+		return state
+
+class Action(Differentia):
+	"""
+	A single action granted by a Figment
+
+	Action.__init__(self, name="", tree=(), id_="", method=Game.co_pass, is_root=False, saved_state=None)
+	Action.to_dict(self)
+	"""
+
+	def __init__(self, name="", tree=(), id_="", method=Game.co_pass, is_root=False, saved_state=None):
+		"""Initialze the Action, perhaps from a saved state."""
+
+		super(Action, self).__init__(name, tree, id_, method, is_root, saved_state)
+
+	def to_dict(self):
+		"""Create a JSON-serializable dict representation of the Action."""
+
+		state = super(Action, self).to_dict()
 
 		# Return state
 		return state

@@ -131,7 +131,17 @@ class ConsoleRenderer(Renderer):
 
 				else:
 
-					col_pad.addstr(index, 0, names[index])
+					try:
+						col_pad.addstr(index, 0, names[index])
+
+					except:
+
+						# *** DEBUG ***
+						s = ""
+						s = s + object.__repr__(self._app._game._state.map.get_mobs()[0].status)
+						s = s + object.__repr__(self._app._game._state.map.get_mobs()[1].status)
+						exit(s)
+						# *** DEBUG ***
 
 			pads.append(col_pad)
 
@@ -174,6 +184,15 @@ class ConsoleRenderer(Renderer):
 			if self._change_flag != VIEW_MAP:
 
 				self._change_flag = VIEW_MAP
+				self._app._screen.redrawwin()
+
+		elif self._app._game._state.index[0] == VIEW_DC:
+
+			self._view_coag(root_level=1)
+
+			if self._change_flag != VIEW_DC:
+
+				self._change_flag = VIEW_DC
 				self._app._screen.redrawwin()
 
 		elif self._app._game._state.index[0] == VIEW_PAUSE:
