@@ -136,12 +136,7 @@ class ConsoleRenderer(Renderer):
 
 					except:
 
-						# *** DEBUG ***
-						s = ""
-						s = s + object.__repr__(self._app._game._state.map.get_mobs()[0].status)
-						s = s + object.__repr__(self._app._game._state.map.get_mobs()[1].status)
-						exit(s)
-						# *** DEBUG ***
+						pass
 
 			pads.append(col_pad)
 

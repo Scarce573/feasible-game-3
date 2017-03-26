@@ -175,7 +175,7 @@ class Game(object):
 	Game._act_move(self, mob, direction)
 	Game._build_controls(self)
 	Game._deref_index(self)
-	Game._do_action(self, mob, action)
+	Game._do_action(self, mob, action, *args)
 	Game._io_coag_back(self)
 	Game._io_coag_next(self)
 	Game._io_coag_prev(self)
@@ -192,12 +192,14 @@ class Game(object):
 	Game._mod_change_index(self, index=0, to_value=None, set_all=False, stored_index=False)
 	Game._mod_console_add_char(self, char)
 	Game._mod_console_new_message(self)
+	Game._mod_console_post_message(self, message)
 	Game._mod_console_run_message(self)
 	Game._mod_move(self, mob, to_coords)
 	Game._mod_set_next_turn(self, mob, action)
 	Game._mod_toggle_index(self)
 	Game._stop(self)
 	Game._turn(self)
+	Game.co_do_action(self)
 	Game.co_pass(self)
 	Game.co_quit(self)
 	Game.co_resume(self)
@@ -344,14 +346,12 @@ class Game(object):
 
 			return coag
 
-	def _do_action(self, mob, action):
+	def _do_action(self, mob, action, *args):
 		"""Change state based on which action is performed by what mob."""
 
-		# *** DEBUG ***
-		path = _path_from_id(action)
+		path = _path_from_id(action.id)
 		action_file = open(path, 'r')
 		exec(action_file.read())
-		# *** DEBUG ***
 		pass
 
 	def _io_coag_back(self):
@@ -487,6 +487,10 @@ class Game(object):
 
 		self._state.message_log.append("> ")
 
+	def _mod_console_post_message(self, message):
+
+		self._state.message_log.append(message)
+
 	def _mod_console_run_message(self):
 		"""Run the current console message."""
 
@@ -504,9 +508,9 @@ class Game(object):
 
 			pass
 
-		except:
+		except Exception as error:
 
-			self._state.message_log.append("Error!")
+			self._mod_console_post_message(str(error))
 
 	def _mod_move(self, entity, to_coords):
 		"""
@@ -583,7 +587,7 @@ class Game(object):
 		# Execute all of the actions
 		for mob in self._state.map.get_mobs():
 
-			self._do_action(mob, mob.next_turn)
+			self._do_action(mob, *mob.next_turn)
 
 		# Reset/decide the actions for all the next turns
 		for mob in self._state.map.get_mobs():
@@ -591,7 +595,19 @@ class Game(object):
 			ai_type = mob.ai.split(':')[-1]
 			self._mod_set_next_turn(mob, ai[ai_type].DefAI.get_next_turn(self._state.map, mob))
 
+	def co_do_action(self):
+		"""Perform the clicked action next turn."""
+
+		# Set the action to what's in focus
+		player = self._state.index[1]
+		action = self._deref_index(self._state.index)
+		self._mod_set_next_turn(player, [action])
+
+		# Go back to the map view
+		self._mod_toggle_index()
+
 	def co_pass(self):
+		"""Do nothing."""
 
 		pass
 
@@ -641,7 +657,7 @@ class Game(object):
 		will_do_turn = True
 
 		for mob in self._state.map.get_mobs():
-			if mob.next_turn == None:
+			if mob.next_turn == None:	# This uses "== None" because __nonzero__ isn't implemented for Action
 
 				will_do_turn = False
 
@@ -940,9 +956,10 @@ class Entity(object):
 	Entity.__init__(self, coords=(-1, -1, -1), saved_state=None)
 	Entity.__repr__(self)
 	Entity.__str__(self)
+	Entity._find_qualita(self)
+	Entity._find_quanta(self)
 	Entity.to_dict(self)
 
-	Entity.actions
 	Entity.coords
 	Entity.characteristics
 	Entity.dif_coag
@@ -956,26 +973,11 @@ class Entity(object):
 	def __getattr__(self, attr):
 		"""Get an attribute, but do a special behavior with dif_coag."""
 
-		if attr == "actions":
+		if attr == "characteristics":
 
-			actions = None
-			# *** DEBUG ***
-			actions = Coagulate(name="Actions", tree=[])
-			no_op = Action(name="No-op Action", id_="no-op")
-			actions.append(no_op)
-			# *** DEBUG ***
-			return actions
-
-		elif attr == "characteristics":
-
-			characteristics = None
-			# *** DEBUG ***
-			characteristics = Coagulate(name="Characteristics", tree=[])
-			qualita = Coagulate(name="Qualita", tree=[Qualita(name="No-op Qualita", id_="no=op")])
-			quanta = Coagulate(name="Quanta", tree=[Quanta(name="No-op Quanta", id_="no=op")])
-			characteristics.append(qualita)
-			characteristics.append(quanta)
-			# *** DEBUG ***
+			qualita = Coagulate(name="Qualita", tree=self._find_qualita())
+			quanta = Coagulate(name="Quanta", tree=self._find_quanta())
+			characteristics = Coagulate(name="Characteristics", tree=[qualita, quanta])
 			return characteristics
 
 		elif attr == "dif_coag":
@@ -983,13 +985,12 @@ class Entity(object):
 			return Coagulate(tree=[	self.inventory,
 									self.status,
 									self.knowledge,
-									self.characteristics,
-									self.actions],
+									self.characteristics],
 							is_root=True)		
 
 		else:
 
-			return object.__getattr__(self, attr)
+			return super(Entity, self).__getattr__(attr)
 
 	def __init__(self, coords=(-1, -1, -1), saved_state=None):
 		"""Initialize the Entity, perhaps from a saved state."""
@@ -1028,6 +1029,20 @@ class Entity(object):
 		"""Return a string representation of the Entity based off of to_dict."""
 
 		return json.dumps(self.to_dict(), indent=4, separators=(",", ": "), sort_keys=True)
+
+	def _find_qualita(self):
+		"""Find and return the Entity's qualita."""
+
+		# *** DEBUG ***
+		return [Qualita(name="No-op Qualita", id_="no=op")]
+		# *** DEBUG ***
+
+	def _find_quanta(self):
+		"""Find and return the Entity's quanta."""
+
+		# *** DEBUG ***
+		return [Quanta(name="No-op Quanta", id_="no=op")]
+		# *** DEBUG ***
 
 	def to_dict(self):
 		"""
@@ -1076,16 +1091,39 @@ class Mob(Entity):
 	"""
 	An entity with an AI
 
+	Mob.__getattr__(self, attr)
 	Mob.__init__(self, coords=(-1, -1, -1), saved_state=None)
-	Mob.get_actions(self)
+	Mob._find_actions(self)
 	Mob.to_dict(self)
 
 	Mob._actions
+	Mob.actions
 	Mob.ai
 	Mob.next_turn
 
 	Also includes some member variables from Entity
 	"""
+
+	def __getattr__(self, attr):
+		"""Get an attribute, but do a special behavior with dif_coag."""
+
+		if attr == "actions":
+
+			actions = Coagulate(name="Actions", tree=self._find_actions())
+			return actions
+
+		elif attr == "dif_coag":
+
+			return Coagulate(tree=[	self.inventory,
+									self.status,
+									self.knowledge,
+									self.characteristics,
+									self.actions],
+							is_root=True)		
+
+		else:
+
+			return super(Mob, self).__getattr__(attr)
 
 	def __init__(self, coords=(-1, -1, -1), saved_state=None):
 		"""Initialize the Mob, perhaps from a saved state."""
@@ -1094,8 +1132,15 @@ class Mob(Entity):
 
 		if saved_state:
 
+			# Construct _actions
+			actions = []
+
+			for saved_action in saved_state["actions"]:
+
+				actions.append(load_from_dict(saved_action))
+
 			# Loading from a saved_state dict
-			self._actions = saved_state["actions"]
+			self._actions = actions
 			self.ai = saved_state["ai"]
 			self.next_turn = saved_state["next_turn"]
 
@@ -1103,19 +1148,29 @@ class Mob(Entity):
 
 			pass
 
-	def get_actions(self):
-		"""Return the mob's actions."""
+	def _find_actions(self):
+		"""Find and return the Mob's actions."""
 
+		# *** DEBUG ***
 		return self._actions
+		# *** DEBUG ***
 
 	def to_dict(self):
 		"""Create a JSON-serializable dict representation of the Mob."""
 
 		state = super(Mob, self).to_dict()
 
+		# Fix actions
+		saved_actions = []
+
+		for action in self._actions:
+
+			saved_action = action.to_dict()
+			saved_actions.append(saved_action)
+
 		# Construct state
 		state["_type"] = "Mob"
-		state["actions"] = self._actions
+		state["actions"] = saved_actions
 		state["ai"] = self.ai
 		state["next_turn"] = self.next_turn
 
@@ -1333,6 +1388,9 @@ class Figment(Differentia):
 
 		state = super(Figment, self).to_dict()
 
+		# Construct state
+		state["_type"] = "Figment"
+
 		# Return state
 		return state
 
@@ -1354,9 +1412,11 @@ class Item(Figment):
 
 		state = super(Item, self).to_dict()
 
+		# Construct state
+		state["_type"] = "Item"
+
 		# Return state
 		return state
-
 class Status(Figment):
 	"""
 	A physical descriptor of an entity
@@ -1374,6 +1434,9 @@ class Status(Figment):
 		"""Create a JSON-serializable dict representation of the Status."""
 
 		state = super(Status, self).to_dict()
+
+		# Construct state
+		state["_type"] = "Status"
 
 		# Return state
 		return state
@@ -1396,6 +1459,9 @@ class Concept(Figment):
 
 		state = super(Concept, self).to_dict()
 
+		# Construct state
+		state["_type"] = "Concept"
+
 		# Return state
 		return state
 
@@ -1416,6 +1482,9 @@ class Characteristic(Differentia):
 		"""Create a JSON-serializable dict representation of the Characteristic."""
 
 		state = super(Characteristic, self).to_dict()
+
+		# Construct state
+		state["_type"] = "Characteristic"
 
 		# Return state
 		return state
@@ -1438,6 +1507,9 @@ class Qualita(Characteristic):
 
 		state = super(Qualita, self).to_dict()
 
+		# Construct state
+		state["_type"] = "Qualita"
+
 		# Return state
 		return state
 
@@ -1459,6 +1531,9 @@ class Quanta(Characteristic):
 
 		state = super(Quanta, self).to_dict()
 
+		# Construct state
+		state["_type"] = "Quanta"
+
 		# Return state
 		return state
 
@@ -1479,6 +1554,9 @@ class Action(Differentia):
 		"""Create a JSON-serializable dict representation of the Action."""
 
 		state = super(Action, self).to_dict()
+
+		# Construct state
+		state["_type"] = "Action"
 
 		# Return state
 		return state

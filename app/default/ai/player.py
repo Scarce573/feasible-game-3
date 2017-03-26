@@ -30,6 +30,9 @@ class DefAI(AI):
 	@staticmethod
 	def get_move(mob, direction):
 
-		if DIR_ACTION[direction] in mob.get_actions():
+		#if DIR_ACTION[direction] in mob._find_actions():
 
-			return DIR_ACTION[direction]
+		for action in mob.actions:
+			if action.id == DIR_ACTION[direction]:
+
+				return [action]

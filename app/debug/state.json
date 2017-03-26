@@ -1906,14 +1906,78 @@
                             "1": {
                                 "_type": "Mob", 
                                 "actions": [
-                                    "default:action:move_north", 
-                                    "default:action:move_northeast", 
-                                    "default:action:move_east", 
-                                    "default:action:move_southeast", 
-                                    "default:action:move_south", 
-                                    "default:action:move_southwest", 
-                                    "default:action:move_west", 
-                                    "default:action:move_northwest"
+                                    {
+                                        "_type": "Action",
+                                        "id": "default:action:wait",
+                                        "is_root": false,
+                                        "method": "co_do_action",
+                                        "name": "Wait",
+                                        "tree": []
+                                    },
+                                    {
+                                        "_type": "Action",
+                                        "id": "default:action:move_north",
+                                        "is_root": false,
+                                        "method": "co_do_action",
+                                        "name": "Move North",
+                                        "tree": []
+                                    },
+                                    {
+                                        "_type": "Action",
+                                        "id": "default:action:move_northeast",
+                                        "is_root": false,
+                                        "method": "co_do_action",
+                                        "name": "Move Northeast",
+                                        "tree": []
+                                    },
+                                    {
+                                        "_type": "Action",
+                                        "id": "default:action:move_east",
+                                        "is_root": false,
+                                        "method": "co_do_action",
+                                        "name": "Move East",
+                                        "tree": []
+                                    },
+                                    {
+                                        "_type": "Action",
+                                        "id": "default:action:move_southeast",
+                                        "is_root": false,
+                                        "method": "co_do_action",
+                                        "name": "Move Southeast",
+                                        "tree": []
+                                    },
+                                    {
+                                        "_type": "Action",
+                                        "id": "default:action:move_south",
+                                        "is_root": false,
+                                        "method": "co_do_action",
+                                        "name": "Move South",
+                                        "tree": []
+                                    },
+                                    {
+                                        "_type": "Action",
+                                        "id": "default:action:move_southwest",
+                                        "is_root": false,
+                                        "method": "co_do_action",
+                                        "name": "Move Southwest",
+                                        "tree": []
+                                    },
+                                    {
+                                        "_type": "Action",
+                                        "id": "default:action:move_west",
+                                        "is_root": false,
+                                        "method": "co_do_action",
+                                        "name": "Move West",
+                                        "tree": []
+                                    },
+                                    {
+                                        "_type": "Action",
+                                        "id": "default:action:move_northwest",
+                                        "is_root": false,
+                                        "method": "co_do_action",
+                                        "name": "Move Northwest",
+                                        "tree": []
+                                    }
                                 ], 
                                 "ai": "default:ai:player", 
                                 "id": "default:mob:player", 
@@ -5105,15 +5169,86 @@
                             "1": {
                                 "_type": "Mob", 
                                 "actions": [
-                                    "default:action:move_north", 
-                                    "default:action:move_northeast", 
-                                    "default:action:move_east", 
-                                    "default:action:move_southeast", 
-                                    "default:action:move_south", 
-                                    "default:action:move_southwest", 
-                                    "default:action:move_west", 
-                                    "default:action:move_northwest", 
-                                    "default:action:zombie_bite"
+                                    {
+                                        "_type": "Action",
+                                        "id": "default:action:wait",
+                                        "is_root": false,
+                                        "method": "co_do_action",
+                                        "name": "Wait",
+                                        "tree": []
+                                    },
+                                    {
+                                        "_type": "Action",
+                                        "id": "default:action:move_north",
+                                        "is_root": false,
+                                        "method": "co_do_action",
+                                        "name": "Move North",
+                                        "tree": []
+                                    },
+                                    {
+                                        "_type": "Action",
+                                        "id": "default:action:move_northeast",
+                                        "is_root": false,
+                                        "method": "co_do_action",
+                                        "name": "Move Northeast",
+                                        "tree": []
+                                    },
+                                    {
+                                        "_type": "Action",
+                                        "id": "default:action:move_east",
+                                        "is_root": false,
+                                        "method": "co_do_action",
+                                        "name": "Move East",
+                                        "tree": []
+                                    },
+                                    {
+                                        "_type": "Action",
+                                        "id": "default:action:move_southeast",
+                                        "is_root": false,
+                                        "method": "co_do_action",
+                                        "name": "Move Southeast",
+                                        "tree": []
+                                    },
+                                    {
+                                        "_type": "Action",
+                                        "id": "default:action:move_south",
+                                        "is_root": false,
+                                        "method": "co_do_action",
+                                        "name": "Move South",
+                                        "tree": []
+                                    },
+                                    {
+                                        "_type": "Action",
+                                        "id": "default:action:move_southwest",
+                                        "is_root": false,
+                                        "method": "co_do_action",
+                                        "name": "Move Southwest",
+                                        "tree": []
+                                    },
+                                    {
+                                        "_type": "Action",
+                                        "id": "default:action:move_west",
+                                        "is_root": false,
+                                        "method": "co_do_action",
+                                        "name": "Move West",
+                                        "tree": []
+                                    },
+                                    {
+                                        "_type": "Action",
+                                        "id": "default:action:move_northwest",
+                                        "is_root": false,
+                                        "method": "co_do_action",
+                                        "name": "Move Northwest",
+                                        "tree": []
+                                    }, 
+                                    {
+                                        "_type": "Action",
+                                        "id": "default:action:zombie_bite",
+                                        "is_root": false,
+                                        "method": "co_do_action",
+                                        "name": "Zombie Bite",
+                                        "tree": []
+                                    }
                                 ], 
                                 "ai": "default:ai:zombie", 
                                 "id": "default:mob:zombie", 
