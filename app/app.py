@@ -1182,6 +1182,7 @@ class Coagulate(object):
 	The unit of inventory organization; it's effectively a fun list.
 	Everything in a Coagulate must be either of the type Differentia or Coagulate.
 
+	Coagulate.__contains__(self, item)
 	Coagulate.__getitem__(self, index)
 	Coagulate.__init__(self, name="", tree=(), saved_state=None)
 	Coagulate.__len__(self)
@@ -1195,8 +1196,23 @@ class Coagulate(object):
 	Coagulate.name
 	"""
 
+	def __contains__(self, item):
+		"""Check if the Contains an item with that id."""
+
+		for coag in self._tree:
+			try:
+				if index == coag.id:
+
+					return True
+
+			except AttributeError:
+
+				pass
+
+		return False
+
 	def __getitem__(self, index):
-		"""Get the item from Coagulate._tree at index."""
+		"""Get the item from Coagulate._tree at index or by id."""
 
 		if type(index) == int:
 
@@ -1332,7 +1348,7 @@ class Differentia(Coagulate):
 	"""
 	Any game element goes inside of a coagulate.
 	
-	__init__(self, name="", tree=(), id_="", method=Game.co_pass, is_root=False, saved_state=None)
+	__init__(self, name="", id_="", tree=(), method=Game.co_pass, is_root=False, saved_state=None)
 	Differentia.to_dict(self)
 
 	Differentia.id
@@ -1341,7 +1357,7 @@ class Differentia(Coagulate):
 	Also includes some member variables from Coagulate.
 	"""
 
-	def __init__(self, name="", tree=(), id_="", method=Game.co_pass, is_root=False, saved_state=None):
+	def __init__(self, name="", id_="", tree=(), method=Game.co_pass, is_root=False, saved_state=None):
 		"""Initialize the Differentia, perhaps from a saved state."""
 
 		super(Differentia, self).__init__(name, tree, is_root, saved_state)
@@ -1374,14 +1390,14 @@ class Figment(Differentia):
 	"""
 	A figment of the game, such as an item, status, or concept.
 
-	Figment.__init__(self, name="", tree=(), id_="", method=Game.co_pass, is_root=False, saved_state=None)
+	Figment.__init__(self, name="", id_="", tree=(), method=Game.co_pass, is_root=False, saved_state=None)
 	Figment.to_dict(self)
 	"""
 
-	def __init__(self, name="", tree=(), id_="", method=Game.co_pass, is_root=False, saved_state=None):
+	def __init__(self, name="", id_="", tree=(), method=Game.co_pass, is_root=False, saved_state=None):
 		"""Initialze the Figment, perhaps from a saved state."""
 
-		super(Figment, self).__init__(name, tree, id_, method, is_root, saved_state)
+		super(Figment, self).__init__(name, id_, tree, method, is_root, saved_state)
 
 	def to_dict(self):
 		"""Create a JSON-serializable dict representation of the Figment."""
@@ -1398,14 +1414,14 @@ class Item(Figment):
 	"""
 	An item, something which can be picked up and dropped
 
-	Item.__init__(self, name="", tree=(), id_="", method=Game.co_pass, is_root=False, saved_state=None)
+	Item.__init__(self, name="", id_="", tree=(), method=Game.co_pass, is_root=False, saved_state=None)
 	Item.to_dict(self)
 	"""
 
-	def __init__(self, name="", tree=(), id_="", method=Game.co_pass, is_root=False, saved_state=None):
+	def __init__(self, name="", id_="", tree=(), method=Game.co_pass, is_root=False, saved_state=None):
 		"""Initialze the Item, perhaps from a saved state."""
 
-		super(Item, self).__init__(name, tree, id_, method, is_root, saved_state)
+		super(Item, self).__init__(name, id_, tree, method, is_root, saved_state)
 
 	def to_dict(self):
 		"""Create a JSON-serializable dict representation of the Item."""
@@ -1417,18 +1433,19 @@ class Item(Figment):
 
 		# Return state
 		return state
+
 class Status(Figment):
 	"""
 	A physical descriptor of an entity
 
-	Status.__init__(self, name="", tree=(), id_="", method=Game.co_pass, is_root=False, saved_state=None)
+	Status.__init__(self, name="", id_="", tree=(), method=Game.co_pass, is_root=False, saved_state=None)
 	Status.to_dict(self)
 	"""
 
-	def __init__(self, name="", tree=(), id_="", method=Game.co_pass, is_root=False, saved_state=None):
+	def __init__(self, name="", id_="", tree=(), method=Game.co_pass, is_root=False, saved_state=None):
 		"""Initialze the Status, perhaps from a saved state."""
 
-		super(Status, self).__init__(name, tree, id_, method, is_root, saved_state)
+		super(Status, self).__init__(name, id_, tree, method, is_root, saved_state)
 
 	def to_dict(self):
 		"""Create a JSON-serializable dict representation of the Status."""
@@ -1445,14 +1462,14 @@ class Concept(Figment):
 	"""
 	A non-physical descriptor of an entity.
 
-	Concept.__init__(self, name="", tree=(), id_="", method=Game.co_pass, is_root=False, saved_state=None)
+	Concept.__init__(self, name="", id_="", tree=(), method=Game.co_pass, is_root=False, saved_state=None)
 	Concept.to_dict(self)
 	"""
 
-	def __init__(self, name="", tree=(), id_="", method=Game.co_pass, is_root=False, saved_state=None):
+	def __init__(self, name="", id_="", tree=(), method=Game.co_pass, is_root=False, saved_state=None):
 		"""Initialze the Concept, perhaps from a saved state."""
 
-		super(Concept, self).__init__(name, tree, id_, method, is_root, saved_state)
+		super(Concept, self).__init__(name, id_, tree, method, is_root, saved_state)
 
 	def to_dict(self):
 		"""Create a JSON-serializable dict representation of the Concept."""
@@ -1469,14 +1486,14 @@ class Characteristic(Differentia):
 	"""
 	A single characteristic granted by a Figment
 
-	Characteristic.__init__(self, name="", tree=(), id_="", method=Game.co_pass, is_root=False, saved_state=None)
+	Characteristic.__init__(self, name="", id_="", tree=(), method=Game.co_pass, is_root=False, saved_state=None)
 	Characteristic.to_dict(self)
 	"""
 
-	def __init__(self, name="", tree=(), id_="", method=Game.co_pass, is_root=False, saved_state=None):
+	def __init__(self, name="", id_="", tree=(), method=Game.co_pass, is_root=False, saved_state=None):
 		"""Initialze the Characteristic, perhaps from a saved state."""
 
-		super(Characteristic, self).__init__(name, tree, id_, method, is_root, saved_state)
+		super(Characteristic, self).__init__(name, id_, tree, method, is_root, saved_state)
 
 	def to_dict(self):
 		"""Create a JSON-serializable dict representation of the Characteristic."""
@@ -1493,14 +1510,14 @@ class Qualita(Characteristic):
 	"""
 	A qualitative Characteristic
 
-	Qualita.__init__(self, name="", tree=(), id_="", method=Game.co_pass, is_root=False, saved_state=None)
+	Qualita.__init__(self, name="", id_="", tree=(), method=Game.co_pass, is_root=False, saved_state=None)
 	Qualita.to_dict(self)
 	"""
 
-	def __init__(self, name="", tree=(), id_="", method=Game.co_pass, is_root=False, saved_state=None):
+	def __init__(self, name="", id_="", tree=(), method=Game.co_pass, is_root=False, saved_state=None):
 		"""Initialze the Qualita, perhaps from a saved state."""
 
-		super(Qualita, self).__init__(name, tree, id_, method, is_root, saved_state)
+		super(Qualita, self).__init__(name, id_, tree, method, is_root, saved_state)
 
 	def to_dict(self):
 		"""Create a JSON-serializable dict representation of the Qualita."""
@@ -1517,14 +1534,14 @@ class Quanta(Characteristic):
 	"""
 	A quantitative Characteristic
 
-	Quanta.__init__(self, name="", tree=(), id_="", method=Game.co_pass, is_root=False, saved_state=None)
+	Quanta.__init__(self, name="", id_="", tree=(), method=Game.co_pass, is_root=False, saved_state=None)
 	Quanta.to_dict(self)
 	"""
 
-	def __init__(self, name="", tree=(), id_="", method=Game.co_pass, is_root=False, saved_state=None):
+	def __init__(self, name="", id_="", tree=(), method=Game.co_pass, is_root=False, saved_state=None):
 		"""Initialze the Quanta, perhaps from a saved state."""
 
-		super(Quanta, self).__init__(name, tree, id_, method, is_root, saved_state)
+		super(Quanta, self).__init__(name, id_, tree, method, is_root, saved_state)
 
 	def to_dict(self):
 		"""Create a JSON-serializable dict representation of the Quanta."""
@@ -1541,14 +1558,14 @@ class Action(Differentia):
 	"""
 	A single action granted by a Figment
 
-	Action.__init__(self, name="", tree=(), id_="", method=Game.co_pass, is_root=False, saved_state=None)
+	Action.__init__(self, name="", id_="", tree=(), method=Game.co_pass, is_root=False, saved_state=None)
 	Action.to_dict(self)
 	"""
 
-	def __init__(self, name="", tree=(), id_="", method=Game.co_pass, is_root=False, saved_state=None):
+	def __init__(self, name="", id_="", tree=(), method=Game.co_pass, is_root=False, saved_state=None):
 		"""Initialze the Action, perhaps from a saved state."""
 
-		super(Action, self).__init__(name, tree, id_, method, is_root, saved_state)
+		super(Action, self).__init__(name, id_, tree, method, is_root, saved_state)
 
 	def to_dict(self):
 		"""Create a JSON-serializable dict representation of the Action."""

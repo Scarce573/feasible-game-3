@@ -65,13 +65,7 @@ class DefAI(AI):
 
 		if DIR_ACTION[direction] == "default:action:wait" and found_flag:
 
-			for action in mob.actions:
-				if action.id == "default:action:zombie_bite":
+			return [mob.actions["default:action:zombie_bite"]]
 
-					return [action]
-
-		for action in mob.actions:
-			if action.id == DIR_ACTION[direction]:
-
-				return [action]
+		return [mob.actions[DIR_ACTION[direction]]]
 		# *** DEBUG ***

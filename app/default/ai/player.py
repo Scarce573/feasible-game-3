@@ -32,7 +32,4 @@ class DefAI(AI):
 
 		#if DIR_ACTION[direction] in mob._find_actions():
 
-		for action in mob.actions:
-			if action.id == DIR_ACTION[direction]:
-
-				return [action]
+		return [mob.actions[DIR_ACTION[direction]]]
