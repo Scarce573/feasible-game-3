@@ -98,60 +98,102 @@ class ConsoleRenderer(Renderer):
 		return message_log_pad
 
 	def _view_coag(self, root_level=0):
-
+		
 		# Load information
 		game_index = self._app._game._state.index
+		# *** DEBUG ***
+		vis_depth = 2
+		vis_number = 15
+		focus_index = 7
+		col_width = 16
+		desc_width = 32
+		# *** DEBUG ***
 
-		cols = []
-
-		for index in range(root_level + 1, len(game_index)):
-
-			coag_or_dif = self._app._game._deref_index(game_index[:index])
-
-			names = []
-
-			for item in range(len(coag_or_dif)):
-
-				names.append(coag_or_dif[item].name)
-
-			cols.append(names)
-
-		# Make pads
+		# Make a pad for each column
 		pads = []
 
-		for names in cols:
+		for depth in range(vis_depth):
 
-			col_pad = curses.newpad(16, 16)
+			# Get each coagulate and generate the names/items to print
+			# If you can't go that far back, continue
+			try: coag = self._app._game._deref_index(game_index[:-depth - 1])
+			except IndexError: continue
+			# Find the index in the coagulate which should be highlighted
+			focus = game_index[-depth - 1]
+			# Construct all the names
+			all_items = []
 
-			for index in range(len(names)):
+			for item in coag:
 
-				if names == cols[-1] and index == game_index[-1]:
+				all_items.append(item.name)
 
-					col_pad.addstr(index, 0, names[index], curses.A_STANDOUT)
+			# Find the section (items) of the names which should be selected
+			# Offset should be added to an index to make it the effective index
+			upper = focus + (vis_number - focus_index - 1)
+			lower = focus - (focus_index - 1)
+
+			if lower <= 0: 
+
+				offset = 0
+
+			elif upper >= len(coag): 
+
+				offset = len(coag) - min(vis_number, len(coag))
+
+			else: 
+
+				offset = focus - focus_index
+
+			# Build the pad
+			col_pad = curses.newpad(vis_number + 1, col_width)
+			col_pad.addstr(0, 0, coag.name, curses.A_BOLD)
+
+			for row in range(vis_number):
+
+				if row + offset == focus:
+
+					try: col_pad.addstr(row + 1, 0, all_items[row + offset], curses.A_STANDOUT)
+					except IndexError: pass
 
 				else:
 
-					try:
-						col_pad.addstr(index, 0, names[index])
-
-					except:
-
-						pass
+					try: col_pad.addstr(row + 1, 0, all_items[row + offset])
+					except IndexError: pass
 
 			pads.append(col_pad)
 
-		# Print pads to screen
-		col_num = 0
+		# Build up pads list and add empty pads
+		pads.reverse()
 
-		for index in [-4, -3, -2, -1]:
-			try:
+		while len(pads) < vis_depth:
 
-				pads[index].noutrefresh(0, 0, 0, 16 * col_num, 16, 16 * (col_num + 1))
-				col_num = col_num + 1
+			pads.append(curses.newpad(vis_number + 1, col_width))
 
-			except IndexError:
+		# Add the descriptor pad
+		if len(self._app._game._deref_index(game_index)) == 0:
 
-				pass
+			desc_pad = curses.newpad(vis_number + 1, desc_width)
+
+			info = " ".join(str(self._app._game._deref_index(game_index)).split("    "))
+			info = info.split('\n')
+
+			for line in range(min(vis_number, len(info))):
+
+				desc_pad.addstr(line, 0, info[line])
+
+			pads.append(desc_pad)
+
+		else:
+
+			pads.append(curses.newpad(vis_number + 1, desc_width))
+
+		# Render everything but the last pad
+		for col in range(len(pads) - 1):
+			
+			pads[col].noutrefresh(0, 0, 0, col_width * col, col_width, col_width * (col + 1))
+
+		# Render the desc_pad or its empty replacement
+		pads[-1].noutrefresh(0, 0, 0, col_width * (len(pads) - 1), col_width, col_width * (len(pads) - 1) + desc_width)
 
 	def _view_map(self):
 

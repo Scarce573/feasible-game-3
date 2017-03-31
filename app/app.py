@@ -726,7 +726,8 @@ class State(object):
 
 				self.stored_index[1] = mob
 
-		self.pause_coag = Coagulate(tree=[	Nub(name="Quit", method=Game.co_quit),
+		self.pause_coag = Coagulate(name="Paused",
+									tree=[	Nub(name="Quit", method=Game.co_quit),
 											Nub(name="Resume", method=Game.co_resume)],
 									is_root=True)
 
@@ -982,11 +983,12 @@ class Entity(object):
 
 		elif attr == "dif_coag":
 
-			return Coagulate(tree=[	self.inventory,
-									self.status,
-									self.knowledge,
-									self.characteristics],
-							is_root=True)		
+			return Coagulate(	name="Dif. Coagulate",
+								tree=[	self.inventory,
+										self.status,
+										self.knowledge,
+										self.characteristics],
+								is_root=True)
 
 		else:
 
@@ -1188,12 +1190,13 @@ class Mob(Entity):
 
 		elif attr == "dif_coag":
 
-			return Coagulate(tree=[	self.inventory,
-									self.status,
-									self.knowledge,
-									self.characteristics,
-									self.actions],
-							is_root=True)		
+			return Coagulate(	name="Dif. Coagulate",
+								tree=[	self.inventory,
+										self.status,
+										self.knowledge,
+										self.characteristics,
+										self.actions],
+								is_root=True)		
 
 		else:
 
@@ -1698,7 +1701,7 @@ class Characteristic(Differentia):
 
 		# Construct state
 		state["_type"] = "Characteristic"
-		state["value"] = self.value
+		state["value"] = self._value
 
 		# Return state
 		return state
