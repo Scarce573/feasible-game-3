@@ -1011,9 +1011,47 @@ class Entity(object):
 		self.status = Coagulate(name="Status", tree=[])
 		self.knowledge = Coagulate(name="Knowledge", tree=[])
 
-		sword = Item(name="Sword", id_="default:item:sword")
-		human =  Status(name="Human", id_="default:status:human")
-		fireball = Concept(name="Fireball", id_="default:concept:fireball")
+		sword = Item(	name="Sword", 
+						id_="default:item:sword",
+						actions=[],
+						qualita_inate=[Qualita(name="Iron", id_="default:quanta:iron")],
+						qualita_inherited=[],
+						quanta_inate=[Quanta(name="Length", id_="default:quanta:length", value=1)],
+						quanta_inherited=[])
+
+		human =  Status(name="Human", 
+						id_="default:status:human",
+						actions=[	[Action(name="Wait", id_="default:action:wait"), "True"],
+									[Action(name="Move North", id_="default:action:move_north"), "True"],
+									[Action(name="Move Northeast", id_="default:action:move_northeast"), "True"],
+									[Action(name="Move East", id_="default:action:move_east"), "True"],
+									[Action(name="Move Southeast", id_="default:action:move_southeast"), "True"],
+									[Action(name="Move South", id_="default:action:move_south"), "True"],
+									[Action(name="Move Southwest", id_="default:action:move_southwest"), "True"],
+									[Action(name="Move West", id_="default:action:move_west"), "True"],
+									[Action(name="Move Northwest", id_="default:action:move_northwest"), "True"],
+									[Action(name="Zombie Bite", id_="default:action:zombie_bite"), "True"]],
+						qualita_inate=[Qualita(name="Body Type", id_="default:qualita:body_type", value="default:qualita:body_type:humanoid")],
+						qualita_inherited=[	[	Qualita(name="Race: Human", 
+														id_="default:qualita:race", 
+														value="default:qualita:race:human"), 
+												"True"],
+											[	Qualita(name="Living", 
+														id_="default:qualita:living"), 
+												"True"]],
+						quanta_inate=[Quanta(name="Time", id_="default:quanta:_time", value=-1)],
+						quanta_inherited=[	[	Quanta(	name="Perm: Organism",
+														id_="default:quanta:_permeability",
+														value=1),
+												"True"]])
+
+		fireball = Concept(	name="Fireball",
+							id_="default:concept:fireball",
+							actions=[],
+							qualita_inate=[Quanta(name="Spell", id_="default:quanta:spell")],
+							qualita_inherited=[],
+							quanta_inate=[Quanta(name="Radius", id_="default:quanta:radius", value=1)],
+							quanta_inherited=[])
 
 		self.inventory.append(copy.deepcopy(sword))
 		self.status.append(copy.deepcopy(human))
@@ -1033,16 +1071,53 @@ class Entity(object):
 	def _find_qualita(self):
 		"""Find and return the Entity's qualita."""
 
-		# *** DEBUG ***
-		return [Qualita(name="No-op Qualita", id_="no=op")]
-		# *** DEBUG ***
+		qualita_list = []
+
+		for item in self.inventory:
+			for inherit_group in item.qualita_inherited:
+				if eval(inherit_group[1]):
+
+					qualita_list.append(inherit_group[0])
+
+		for status in self.status:
+			for inherit_group in status.qualita_inherited:
+				if eval(inherit_group[1]):
+
+					qualita_list.append(inherit_group[0])
+
+		for concept in self.knowledge:
+			for inherit_group in concept.qualita_inherited:
+				if eval(inherit_group[1]):
+
+					qualita_list.append(inherit_group[0])
+
+		return qualita_list
 
 	def _find_quanta(self):
 		"""Find and return the Entity's quanta."""
+		
+		quanta_list = []
 
-		# *** DEBUG ***
-		return [Quanta(name="No-op Quanta", id_="no=op")]
-		# *** DEBUG ***
+		for item in self.inventory:
+			for inherit_group in item.quanta_inherited:
+
+				if eval(inherit_group[1]):
+
+					quanta_list.append(inherit_group[0])
+
+		for status in self.status:
+			for inherit_group in status.quanta_inherited:
+				if eval(inherit_group[1]):
+
+					quanta_list.append(inherit_group[0])
+
+		for concept in self.knowledge:
+			for inherit_group in concept.quanta_inherited:
+				if eval(inherit_group[1]):
+
+					quanta_list.append(inherit_group[0])
+
+		return quanta_list
 
 	def to_dict(self):
 		"""
@@ -1096,7 +1171,6 @@ class Mob(Entity):
 	Mob._find_actions(self)
 	Mob.to_dict(self)
 
-	Mob._actions
 	Mob.actions
 	Mob.ai
 	Mob.next_turn
@@ -1132,15 +1206,7 @@ class Mob(Entity):
 
 		if saved_state:
 
-			# Construct _actions
-			actions = []
-
-			for saved_action in saved_state["actions"]:
-
-				actions.append(load_from_dict(saved_action))
-
 			# Loading from a saved_state dict
-			self._actions = actions
 			self.ai = saved_state["ai"]
 			self.next_turn = saved_state["next_turn"]
 
@@ -1151,26 +1217,36 @@ class Mob(Entity):
 	def _find_actions(self):
 		"""Find and return the Mob's actions."""
 
-		# *** DEBUG ***
-		return self._actions
-		# *** DEBUG ***
+		action_list = []
+
+		for item in self.inventory:
+			for inherit_group in item.actions:
+
+				if eval(inherit_group[1]):
+
+					action_list.append(inherit_group[0])
+
+		for status in self.status:
+			for inherit_group in status.actions:
+				if eval(inherit_group[1]):
+
+					action_list.append(inherit_group[0])
+
+		for concept in self.knowledge:
+			for inherit_group in concept.actions:
+				if eval(inherit_group[1]):
+
+					action_list.append(inherit_group[0])
+
+		return action_list
 
 	def to_dict(self):
 		"""Create a JSON-serializable dict representation of the Mob."""
 
 		state = super(Mob, self).to_dict()
 
-		# Fix actions
-		saved_actions = []
-
-		for action in self._actions:
-
-			saved_action = action.to_dict()
-			saved_actions.append(saved_action)
-
 		# Construct state
 		state["_type"] = "Mob"
-		state["actions"] = saved_actions
 		state["ai"] = self.ai
 		state["next_turn"] = self.next_turn
 
@@ -1201,7 +1277,7 @@ class Coagulate(object):
 
 		for coag in self._tree:
 			try:
-				if index == coag.id:
+				if item == coag.id:
 
 					return True
 
@@ -1390,22 +1466,123 @@ class Figment(Differentia):
 	"""
 	A figment of the game, such as an item, status, or concept.
 
-	Figment.__init__(self, name="", id_="", tree=(), method=Game.co_pass, is_root=False, saved_state=None)
+	Figment.__getattr__(self, attr)
+	Figment.__init__(	self, name="", id_="", method=Game.co_pass, actions=[], qualita_inate=[], qualita_inherited=[], 
+						quanta_inate=[], quanta_inherited=[], is_root=False, saved_state=None)
 	Figment.to_dict(self)
+
+	Figment.actions
+	Figment.qualita_inate
+	Figment.qualita_inherited
+	Figment.quanta_inate
+	Figment.quanta_inherited
 	"""
 
-	def __init__(self, name="", id_="", tree=(), method=Game.co_pass, is_root=False, saved_state=None):
+	def __getattr__(self, attr):
+		"""Get an attribute, but do a special behavior with inate characteristics."""
+
+		if attr == "qualita_inate":
+
+			return self._tree[0]
+
+		elif attr == "quanta_inate":
+
+			return self._tree[1]
+
+		else:
+
+			super(Figment, self).__getattr__(attr)
+
+	def __init__(	self, name="", id_="", method=Game.co_pass, actions=[], qualita_inate=[], qualita_inherited=[], 
+					quanta_inate=[], quanta_inherited=[], is_root=False, saved_state=None):
 		"""Initialze the Figment, perhaps from a saved state."""
 
-		super(Figment, self).__init__(name, id_, tree, method, is_root, saved_state)
+		super(Figment, self).__init__(name, id_, [], method, is_root, saved_state)
+
+		if saved_state:
+
+			# Loading from a saved_state dict
+			self._tree.append(load_from_dict(saved_state["qualita_inate"]))
+			self._tree.append(load_from_dict(saved_state["quanta_inate"]))
+			
+			# Construct inherit lists
+			self.actions = []
+			self.qualita_inherited = []
+			self.quanta_inherited = []
+
+			for saved_action in saved_state["actions"]:
+
+				action = []
+				action.append(load_from_dict(saved_action[0]))
+				action.extend(saved_action[1:])
+				self.actions.append(action)
+
+			for saved_qualita in saved_state["qualita_inherited"]:
+
+				qualita = []
+				qualita.append(load_from_dict(saved_qualita[0]))
+				qualita.extend(saved_qualita[1:])
+				self.actions.append(qualita)
+
+			for saved_quanta in saved_state["quanta_inherited"]:
+
+				quanta = []
+				quanta.append(load_from_dict(saved_quanta[0]))
+				quanta.extend(saved_quanta[1:])
+				self.actions.append(quanta)
+
+		else:
+
+			self.actions = actions
+
+			self._tree.append(Coagulate(name="Qualita",
+										tree=qualita_inate,
+										is_root=False))
+			self.qualita_inherited = qualita_inherited
+
+			self._tree.append(Coagulate(name="Quanta",
+										tree=quanta_inate,
+										is_root=False))
+			self.quanta_inherited = quanta_inherited
 
 	def to_dict(self):
 		"""Create a JSON-serializable dict representation of the Figment."""
 
 		state = super(Figment, self).to_dict()
 
+		# Fix inherit lists
+		saved_actions = []
+		saved_qualita_inherited = []
+		saved_quanta_inherited = []
+
+		for action in self.actions:
+
+			saved_action = []
+			saved_action.append(action[0].to_dict())
+			saved_action.extend(action[1:])
+			saved_actions.append(saved_action)
+
+		for qualita in self.qualita_inherited:
+
+			saved_qualita = []
+			saved_qualita.append(qualita[0].to_dict())
+			saved_qualita.extend(qualita[1:])
+			saved_qualita_inherited.append(saved_qualita)
+
+		for quanta in self.quanta_inherited:
+
+			saved_quanta = []
+			saved_quanta.append(quanta[0].to_dict())
+			saved_quanta.extend(quanta[1:])
+			saved_quanta_inherited.append(saved_quanta)
+
 		# Construct state
 		state["_type"] = "Figment"
+		state["actions"] = saved_actions
+		state["qualita_inate"] = self.qualita_inate.to_dict()
+		state["qualita_inherited"] = saved_qualita_inherited
+		state["quanta_inate"] = self.quanta_inate.to_dict()
+		state["quanta_inherited"] = saved_quanta_inherited
 
 		# Return state
 		return state
@@ -1414,14 +1591,17 @@ class Item(Figment):
 	"""
 	An item, something which can be picked up and dropped
 
-	Item.__init__(self, name="", id_="", tree=(), method=Game.co_pass, is_root=False, saved_state=None)
+	Item.__init__(	self, name="", id_="", method=Game.co_pass, actions=[], qualita_inate=[], qualita_inherited=[], 
+					quanta_inate=[], quanta_inherited=[], is_root=False, saved_state=None)
 	Item.to_dict(self)
 	"""
 
-	def __init__(self, name="", id_="", tree=(), method=Game.co_pass, is_root=False, saved_state=None):
+	def __init__(	self, name="", id_="", method=Game.co_pass, actions=[], qualita_inate=[], qualita_inherited=[], 
+					quanta_inate=[], quanta_inherited=[], is_root=False, saved_state=None):
 		"""Initialze the Item, perhaps from a saved state."""
 
-		super(Item, self).__init__(name, id_, tree, method, is_root, saved_state)
+		super(Item, self).__init__(	name, id_, method, actions, qualita_inate, qualita_inherited, quanta_inate, 
+									quanta_inherited, is_root, saved_state)
 
 	def to_dict(self):
 		"""Create a JSON-serializable dict representation of the Item."""
@@ -1438,15 +1618,17 @@ class Status(Figment):
 	"""
 	A physical descriptor of an entity
 
-	Status.__init__(self, name="", id_="", tree=(), method=Game.co_pass, is_root=False, saved_state=None)
+	Status.__init__(	self, name="", id_="", method=Game.co_pass, actions=[], qualita_inate=[], qualita_inherited=[], 
+						quanta_inate=[], quanta_inherited=[], is_root=False, saved_state=None)
 	Status.to_dict(self)
 	"""
 
-	def __init__(self, name="", id_="", tree=(), method=Game.co_pass, is_root=False, saved_state=None):
+	def __init__(	self, name="", id_="", method=Game.co_pass, actions=[], qualita_inate=[], qualita_inherited=[], 
+					quanta_inate=[], quanta_inherited=[], is_root=False, saved_state=None):
 		"""Initialze the Status, perhaps from a saved state."""
 
-		super(Status, self).__init__(name, id_, tree, method, is_root, saved_state)
-
+		super(Status, self).__init__(	name, id_, method, actions, qualita_inate, qualita_inherited, quanta_inate, 
+										quanta_inherited, is_root, saved_state)
 	def to_dict(self):
 		"""Create a JSON-serializable dict representation of the Status."""
 
@@ -1462,14 +1644,17 @@ class Concept(Figment):
 	"""
 	A non-physical descriptor of an entity.
 
-	Concept.__init__(self, name="", id_="", tree=(), method=Game.co_pass, is_root=False, saved_state=None)
+	Concept.__init__(	self, name="", id_="", method=Game.co_pass, actions=[], qualita_inate=[], qualita_inherited=[], 
+						quanta_inate=[], quanta_inherited=[], is_root=False, saved_state=None)
 	Concept.to_dict(self)
 	"""
 
-	def __init__(self, name="", id_="", tree=(), method=Game.co_pass, is_root=False, saved_state=None):
+	def __init__(	self, name="", id_="", method=Game.co_pass, actions=[], qualita_inate=[], qualita_inherited=[], 
+					quanta_inate=[], quanta_inherited=[], is_root=False, saved_state=None):
 		"""Initialze the Concept, perhaps from a saved state."""
 
-		super(Concept, self).__init__(name, id_, tree, method, is_root, saved_state)
+		super(Concept, self).__init__(	name, id_, method, actions, qualita_inate, qualita_inherited, quanta_inate, 
+										quanta_inherited, is_root, saved_state)
 
 	def to_dict(self):
 		"""Create a JSON-serializable dict representation of the Concept."""
@@ -1486,14 +1671,25 @@ class Characteristic(Differentia):
 	"""
 	A single characteristic granted by a Figment
 
-	Characteristic.__init__(self, name="", id_="", tree=(), method=Game.co_pass, is_root=False, saved_state=None)
+	Characteristic.__init__(self, name="", id_="", value=None, tree=(), method=Game.co_pass, is_root=False, saved_state=None)
 	Characteristic.to_dict(self)
+
+	Characteristic._value
 	"""
 
-	def __init__(self, name="", id_="", tree=(), method=Game.co_pass, is_root=False, saved_state=None):
+	def __init__(self, name="", id_="", value=None, tree=(), method=Game.co_pass, is_root=False, saved_state=None):
 		"""Initialze the Characteristic, perhaps from a saved state."""
 
 		super(Characteristic, self).__init__(name, id_, tree, method, is_root, saved_state)
+
+		if saved_state:
+
+			# Loading from a saved_state dict
+			self._value = saved_state["value"]
+
+		else:
+
+			self._value = value
 
 	def to_dict(self):
 		"""Create a JSON-serializable dict representation of the Characteristic."""
@@ -1502,22 +1698,23 @@ class Characteristic(Differentia):
 
 		# Construct state
 		state["_type"] = "Characteristic"
+		state["value"] = self.value
 
 		# Return state
 		return state
 
 class Qualita(Characteristic):
 	"""
-	A qualitative Characteristic
+	A qualitative Characteristic, with a bool or str value
 
-	Qualita.__init__(self, name="", id_="", tree=(), method=Game.co_pass, is_root=False, saved_state=None)
+	Qualita.__init__(self, name="", id_="", value=True, tree=(), method=Game.co_pass, is_root=False, saved_state=None)
 	Qualita.to_dict(self)
 	"""
 
-	def __init__(self, name="", id_="", tree=(), method=Game.co_pass, is_root=False, saved_state=None):
+	def __init__(self, name="", id_="", value=True, tree=(), method=Game.co_pass, is_root=False, saved_state=None):
 		"""Initialze the Qualita, perhaps from a saved state."""
 
-		super(Qualita, self).__init__(name, id_, tree, method, is_root, saved_state)
+		super(Qualita, self).__init__(name, id_, value, tree, method, is_root, saved_state)
 
 	def to_dict(self):
 		"""Create a JSON-serializable dict representation of the Qualita."""
@@ -1534,14 +1731,14 @@ class Quanta(Characteristic):
 	"""
 	A quantitative Characteristic
 
-	Quanta.__init__(self, name="", id_="", tree=(), method=Game.co_pass, is_root=False, saved_state=None)
+	Quanta.__init__(self, name="", id_="", value=0, tree=(), method=Game.co_pass, is_root=False, saved_state=None)
 	Quanta.to_dict(self)
 	"""
 
-	def __init__(self, name="", id_="", tree=(), method=Game.co_pass, is_root=False, saved_state=None):
+	def __init__(self, name="", id_="", value=0, tree=(), method=Game.co_pass, is_root=False, saved_state=None):
 		"""Initialze the Quanta, perhaps from a saved state."""
 
-		super(Quanta, self).__init__(name, id_, tree, method, is_root, saved_state)
+		super(Quanta, self).__init__(name, id_, value, tree, method, is_root, saved_state)
 
 	def to_dict(self):
 		"""Create a JSON-serializable dict representation of the Quanta."""
@@ -1558,11 +1755,11 @@ class Action(Differentia):
 	"""
 	A single action granted by a Figment
 
-	Action.__init__(self, name="", id_="", tree=(), method=Game.co_pass, is_root=False, saved_state=None)
+	Action.__init__(self, name="", id_="", tree=(), method=Game.co_do_action, is_root=False, saved_state=None)
 	Action.to_dict(self)
 	"""
 
-	def __init__(self, name="", id_="", tree=(), method=Game.co_pass, is_root=False, saved_state=None):
+	def __init__(self, name="", id_="", tree=(), method=Game.co_do_action, is_root=False, saved_state=None):
 		"""Initialze the Action, perhaps from a saved state."""
 
 		super(Action, self).__init__(name, id_, tree, method, is_root, saved_state)
