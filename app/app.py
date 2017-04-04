@@ -7,7 +7,6 @@ import copy
 import curses
 import json
 import os
-import pprint
 import traceback
 
 from mirec_miskuf_json import json_loads_str
@@ -386,7 +385,9 @@ class Game(object):
 		# The referenced Differentia has nothing below it, so call method
 	 	if not len(self._deref_index(self._state.index)):
 
-			self._deref_index(self._state.index).method.__call__(self)
+			try: self._deref_index(self._state.index).method.__call__(self)
+			except AttributeError: pass
+
 			return
 
 		# There's still options to choose from below you, so step in.
@@ -528,7 +529,7 @@ class Game(object):
 		to_layers = self._state.map.grid[to_coords[0]][to_coords[1]].layers
 
 		try:
-			if min(to_layers[to_coords[2]].keys()) <= entity.permeability:
+			if min(to_layers[to_coords[2]].keys()) <= entity.quanta["default:quanta:_permeability"]:
 
 				# A collision has occurred
 				return
@@ -544,7 +545,7 @@ class Game(object):
 			pass
 
 		# Remove the entity
-		del from_layers[entity.coords[2]][entity.permeability]
+		del from_layers[entity.coords[2]][int(entity.quanta["default:quanta:_permeability"])]
 		
 		# Clean up; this would add the default tile (?) if that were implemented
 		while from_layers[-1] == {} and len(from_layers) != 0:
@@ -556,7 +557,7 @@ class Game(object):
 
 			to_layers.append({})
 
-		to_layers[to_coords[2]][entity.permeability] = entity
+		to_layers[to_coords[2]][int(entity.quanta["default:quanta:_permeability"])] = entity
 
 		# Fix entity.coords
 		entity.coords = to_coords
@@ -726,6 +727,10 @@ class State(object):
 
 				self.stored_index[1] = mob
 
+		else:
+
+			pass
+
 		self.pause_coag = Coagulate(name="Paused",
 									tree=[	Nub(name="Quit", method=Game.co_quit),
 											Nub(name="Resume", method=Game.co_resume)],
@@ -751,7 +756,7 @@ class State(object):
 
 		if type(self.index[1]) == Mob:
 
-			saved_index[1] = [self.index[1].coords, self.index[1].permeability]
+			saved_index[1] = [self.index[1].coords, self.index[1].quanta["default:quanta:_permeability"]]
 
 		# Construct state
 		state["_type"] = "State"
@@ -967,19 +972,23 @@ class Entity(object):
 	Entity.id
 	Entity.inventory
 	Entity.knowledge
-	Entity.permeability
 	Entity.status
 	"""
 
 	def __getattr__(self, attr):
 		"""Get an attribute, but do a special behavior with dif_coag."""
 
-		if attr == "characteristics":
+		if attr == "qualita":
 
-			qualita = Coagulate(name="Qualita", tree=self._find_qualita())
-			quanta = Coagulate(name="Quanta", tree=self._find_quanta())
-			characteristics = Coagulate(name="Characteristics", tree=[qualita, quanta])
-			return characteristics
+			return Coagulate(name="Qualita", tree=self._find_qualita())
+
+		elif attr == "quanta":
+
+			return Coagulate(name="Quanta", tree=self._find_quanta())
+
+		elif attr == "characteristics":
+
+			return Coagulate(name="Characteristics", tree=[self.qualita, self.quanta])
 
 		elif attr == "dif_coag":
 
@@ -1001,7 +1010,7 @@ class Entity(object):
 
 			# Loading from a saved_state dict
 			self.id = saved_state["id"]
-			self.permeability = saved_state["permeability"]
+			#self.dif_coag = load_from_dict(saved_state["dif_coag"])
 
 		else:
 
@@ -1009,55 +1018,147 @@ class Entity(object):
 
 		self.coords = coords
 		# *** DEBUG ***
-		self.inventory = Coagulate(name="Inventory", tree=[])
-		self.status = Coagulate(name="Status", tree=[])
-		self.knowledge = Coagulate(name="Knowledge", tree=[])
+		if self.id == "default:mob:player":
 
-		sword = Item(	name="Sword", 
-						id_="default:item:sword",
-						actions=[],
-						qualita_inate=[Qualita(name="Iron", id_="default:quanta:iron")],
-						qualita_inherited=[],
-						quanta_inate=[Quanta(name="Length", id_="default:quanta:length", value=1)],
-						quanta_inherited=[])
+			self.inventory = Coagulate(name="Inventory", tree=[])
+			self.status = Coagulate(name="Status", tree=[])
+			self.knowledge = Coagulate(name="Knowledge", tree=[])
 
-		human =  Status(name="Human", 
-						id_="default:status:human",
-						actions=[	[Action(name="Wait", id_="default:action:wait"), "True"],
-									[Action(name="Move North", id_="default:action:move_north"), "True"],
-									[Action(name="Move Northeast", id_="default:action:move_northeast"), "True"],
-									[Action(name="Move East", id_="default:action:move_east"), "True"],
-									[Action(name="Move Southeast", id_="default:action:move_southeast"), "True"],
-									[Action(name="Move South", id_="default:action:move_south"), "True"],
-									[Action(name="Move Southwest", id_="default:action:move_southwest"), "True"],
-									[Action(name="Move West", id_="default:action:move_west"), "True"],
-									[Action(name="Move Northwest", id_="default:action:move_northwest"), "True"],
-									[Action(name="Zombie Bite", id_="default:action:zombie_bite"), "True"]],
-						qualita_inate=[Qualita(name="Body Type", id_="default:qualita:body_type", value="default:qualita:body_type:humanoid")],
-						qualita_inherited=[	[	Qualita(name="Race: Human", 
-														id_="default:qualita:race", 
-														value="default:qualita:race:human"), 
-												"True"],
-											[	Qualita(name="Living", 
-														id_="default:qualita:living"), 
-												"True"]],
-						quanta_inate=[Quanta(name="Time", id_="default:quanta:_time", value=-1)],
-						quanta_inherited=[	[	Quanta(	name="Perm: Organism",
-														id_="default:quanta:_permeability",
-														value=1),
-												"True"]])
-
-		fireball = Concept(	name="Fireball",
-							id_="default:concept:fireball",
+			sword = Item(	name="Sword", 
+							id_="default:item:sword",
 							actions=[],
-							qualita_inate=[Quanta(name="Spell", id_="default:quanta:spell")],
+							qualita_inate=[Qualita(name="Iron", id_="default:quanta:iron")],
 							qualita_inherited=[],
-							quanta_inate=[Quanta(name="Radius", id_="default:quanta:radius", value=1)],
+							quanta_inate=[],
 							quanta_inherited=[])
 
-		self.inventory.append(copy.deepcopy(sword))
-		self.status.append(copy.deepcopy(human))
-		self.knowledge.append(copy.deepcopy(fireball))
+			human =  Status(name="Human", 
+							id_="default:status:human",
+							actions=[	[Action(name="Wait", id_="default:action:wait"), "True"],
+										[Action(name="Move North", id_="default:action:move_north"), "True"],
+										[Action(name="Move Northeast", id_="default:action:move_northeast"), "True"],
+										[Action(name="Move East", id_="default:action:move_east"), "True"],
+										[Action(name="Move Southeast", id_="default:action:move_southeast"), "True"],
+										[Action(name="Move South", id_="default:action:move_south"), "True"],
+										[Action(name="Move Southwest", id_="default:action:move_southwest"), "True"],
+										[Action(name="Move West", id_="default:action:move_west"), "True"],
+										[Action(name="Move Northwest", id_="default:action:move_northwest"), "True"]],
+							qualita_inate=[Qualita(name="Body Type", id_="default:qualita:body_type", value="default:qualita:body_type:humanoid")],
+							qualita_inherited=[	[	Qualita(name="Race: Human", 
+															id_="default:qualita:race", 
+															value="default:qualita:race:human"), 
+													"True"],
+												[	Qualita(name="Living", 
+															id_="default:qualita:living"), 
+													"True"]],
+							quanta_inate=[Quanta(name="Time", id_="default:quanta:_time", value=-1)],
+							quanta_inherited=[	[	Quanta(	name="Perm: Organism",
+															id_="default:quanta:_permeability",
+															value=1),
+													"True"]])
+
+			fireball = Concept(	name="Fireball",
+								id_="default:concept:fireball",
+								actions=[],
+								qualita_inate=[Quanta(name="Spell", id_="default:quanta:spell")],
+								qualita_inherited=[],
+								quanta_inate=[Quanta(name="Radius", id_="default:quanta:radius", value=1)],
+								quanta_inherited=[])
+
+			self.inventory.append(copy.deepcopy(sword))
+			self.status.append(copy.deepcopy(human))
+			self.knowledge.append(copy.deepcopy(fireball))
+
+		elif self.id == "default:mob:zombie":
+
+			self.inventory = Coagulate(name="Inventory", tree=[])
+			self.status = Coagulate(name="Status", tree=[])
+			self.knowledge = Coagulate(name="Knowledge", tree=[])
+
+			zombie =  Status(name="Zombie", 
+							id_="default:status:zombie",
+							actions=[	[Action(name="Wait", id_="default:action:wait"), "True"],
+										[Action(name="Move North", id_="default:action:move_north"), "True"],
+										[Action(name="Move Northeast", id_="default:action:move_northeast"), "True"],
+										[Action(name="Move East", id_="default:action:move_east"), "True"],
+										[Action(name="Move Southeast", id_="default:action:move_southeast"), "True"],
+										[Action(name="Move South", id_="default:action:move_south"), "True"],
+										[Action(name="Move Southwest", id_="default:action:move_southwest"), "True"],
+										[Action(name="Move West", id_="default:action:move_west"), "True"],
+										[Action(name="Move Northwest", id_="default:action:move_northwest"), "True"],
+										[Action(name="Zombie Bite", id_="default:action:zombie_bite"), "True"]],
+							qualita_inate=[Qualita(name="Body Type", id_="default:qualita:body_type", value="default:qualita:body_type:humanoid")],
+							qualita_inherited=[	[	Qualita(name="Race: Zombie", 
+															id_="default:qualita:race", 
+															value="default:qualita:race:zombie"), 
+													"True"],
+												[	Qualita(name="Undead", 
+															id_="default:qualita:undead"), 
+													"True"]],
+							quanta_inate=[Quanta(name="Time", id_="default:quanta:_time", value=-1)],
+							quanta_inherited=[	[	Quanta(	name="Perm: Organism",
+															id_="default:quanta:_permeability",
+															value=1),
+													"True"]])
+
+			self.status.append(copy.deepcopy(zombie))
+
+		elif self.id == "default:nonmob:grass":
+
+			self.inventory = Coagulate(name="Inventory", tree=[])
+			self.status = Coagulate(name="Status", tree=[])
+			self.knowledge = Coagulate(name="Knowledge", tree=[])
+
+			grass =  Status(name="Grass", 
+							id_="default:status:grass",
+							actions=[],
+							qualita_inate=[],
+							qualita_inherited=[],
+							quanta_inate=[Quanta(name="Time", id_="default:quanta:_time", value=-1)],
+							quanta_inherited=[	[	Quanta(	name="Perm: Solid",
+															id_="default:quanta:_permeability",
+															value=0),
+													"True"]])
+
+			self.status.append(copy.deepcopy(grass))
+
+		elif self.id == "default:nonmob:stone":
+
+			self.inventory = Coagulate(name="Inventory", tree=[])
+			self.status = Coagulate(name="Status", tree=[])
+			self.knowledge = Coagulate(name="Knowledge", tree=[])
+
+			stone =  Status(name="Stone", 
+							id_="default:status:stone",
+							actions=[],
+							qualita_inate=[],
+							qualita_inherited=[],
+							quanta_inate=[Quanta(name="Time", id_="default:quanta:_time", value=-1)],
+							quanta_inherited=[	[	Quanta(	name="Perm: Solid",
+															id_="default:quanta:_permeability",
+															value=0),
+													"True"]])
+
+			self.status.append(copy.deepcopy(stone))
+
+		else:
+
+			self.inventory = Coagulate(name="Inventory", tree=[])
+			self.status = Coagulate(name="Status", tree=[])
+			self.knowledge = Coagulate(name="Knowledge", tree=[])
+
+			matter =  Status(name="Matter", 
+							id_="default:status:matter",
+							actions=[],
+							qualita_inate=[],
+							qualita_inherited=[],
+							quanta_inate=[Quanta(name="Time", id_="default:quanta:_time", value=-1)],
+							quanta_inherited=[	[	Quanta(	name="Perm: Solid",
+															id_="default:quanta:_permeability",
+															value=0),
+													"True"]])
+
+			self.status.append(copy.deepcopy(matter))
 		# *** DEBUG ***
 
 	def __repr__(self):
@@ -1132,8 +1233,8 @@ class Entity(object):
 
 		# Construct state
 		state["_type"] = "Entity"
+		state["dif_coag"] = self.dif_coag.to_dict()
 		state["id"] = self.id
-		state["permeability"] = self.permeability
 
 		# Return state
 		return state
@@ -1185,8 +1286,7 @@ class Mob(Entity):
 
 		if attr == "actions":
 
-			actions = Coagulate(name="Actions", tree=self._find_actions())
-			return actions
+			return Coagulate(name="Actions", tree=self._find_actions()) 
 
 		elif attr == "dif_coag":
 
@@ -1734,14 +1834,116 @@ class Quanta(Characteristic):
 	"""
 	A quantitative Characteristic
 
+	Quanta.__eq__(self, other)
+	Quanta.__ge__(self, other)
+	Quanta.__gt__(self, other)
 	Quanta.__init__(self, name="", id_="", value=0, tree=(), method=Game.co_pass, is_root=False, saved_state=None)
+	Quanta.__int__(self)
+	Quanta.__le__(self, other)
+	Quanta.__lt__(self, other)
+	Quanta.__ne__(self, other)
 	Quanta.to_dict(self)
 	"""
+
+	def __eq__(self, other):
+		"""Check if this Quanta has equal value to an other."""
+
+		if type(other) == int:
+
+			return int(self) == other
+
+		elif type(other) == Quanta:
+
+			return int(self) == int(other)
+
+		else:
+
+			return NotImplemented
+
+	def __ge__(self, other):
+		"""Check if this Quanta has a greater or equal value than an other."""
+
+		if type(other) == int:
+
+			return int(self) >= other
+
+		elif type(other) == Quanta:
+
+			return int(self) >= int(other)
+
+		else:
+
+			return NotImplemented
+
+	def __gt__(self, other):
+		"""Check if this Quanta has a greater value than an other."""
+
+		if type(other) == int:
+
+			return int(self) > other
+
+		elif type(other) == Quanta:
+
+			return int(self) > int(other)
+
+		else:
+
+			return NotImplemented
 
 	def __init__(self, name="", id_="", value=0, tree=(), method=Game.co_pass, is_root=False, saved_state=None):
 		"""Initialze the Quanta, perhaps from a saved state."""
 
 		super(Quanta, self).__init__(name, id_, value, tree, method, is_root, saved_state)
+
+	def __int__(self):
+		"""Get an integer representation of the Quanta."""
+
+		return int(self._value)
+
+	def __le__(self, other):
+		"""Check if this Quanta has a lesser or equal value than an other."""
+
+		if type(other) == int:
+
+			return int(self) <= other
+
+		elif type(other) == Quanta:
+
+			return int(self) <= int(other)
+
+		else:
+
+			return NotImplemented
+
+	def __lt__(self, other):
+		"""Check if this Quanta has a lesser value than an other."""
+
+		if type(other) == int:
+
+			return int(self) < other
+
+		elif type(other) == Quanta:
+
+			return int(self) < int(other)
+
+		else:
+
+			return NotImplemented
+
+	def __ne__(self, other):
+		"""Check if this Quanta has unequal value to an other."""
+
+		if type(other) == int:
+
+			return int(self) != other
+
+		elif type(other) == Quanta:
+
+			return int(self) != int(other)
+
+		else:
+
+			return NotImplemented
 
 	def to_dict(self):
 		"""Create a JSON-serializable dict representation of the Quanta."""

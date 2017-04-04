@@ -35,7 +35,7 @@ class DefAI(AI):
 
 				try:
 					tile = map_.grid[mob.coords[0] + x_dif][mob.coords[1] + y_dif]
-					entity = tile.layers[mob.coords[2]][mob.permeability]
+					entity = tile.layers[mob.coords[2]][int(mob.quanta["default:quanta:_permeability"])]
 
 					if entity.id == "default:mob:player":
 
