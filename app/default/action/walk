@@ -1,0 +1,1 @@
+self._act_move(mob, args[0])

@@ -237,7 +237,7 @@ class Game(object):
 
 	def _act_move(self, mob, direction):
 		"""
-		Moves the mob 1 unit in direction so that the mob can collide.
+		Walks the mob 1 unit in direction so that the mob can collide.
 
 		Perhaps this method should return something if there's a failure so action can react?
 		"""
@@ -385,8 +385,12 @@ class Game(object):
 		# The referenced Differentia has nothing below it, so call method
 	 	if not len(self._deref_index(self._state.index)):
 
-			try: self._deref_index(self._state.index).method.__call__(self)
-			except AttributeError: pass
+	 		method = self._deref_index(self._state.index).method
+
+	 		try: args = method[1:]
+	 		except IndexError: args = []
+			
+			method[0](self, *args)
 
 			return
 
@@ -586,9 +590,11 @@ class Game(object):
 		"""Execute the actions of a turn"""
 
 		# Execute all of the actions
-		for mob in self._state.map.get_mobs():
+		for mob in self._state.map.yield_mobs():
 
 			self._do_action(mob, *mob.next_turn)
+			# Set the next turn to None to tell the game to not do their turn again
+			self._mod_set_next_turn(mob, None)
 
 		# Reset/decide the actions for all the next turns
 		for mob in self._state.map.get_mobs():
@@ -596,13 +602,14 @@ class Game(object):
 			ai_type = mob.ai.split(':')[-1]
 			self._mod_set_next_turn(mob, ai[ai_type].DefAI.get_next_turn(self._state.map, mob))
 
-	def co_do_action(self):
+	def co_do_action(self, *args):
 		"""Perform the clicked action next turn."""
 
 		# Set the action to what's in focus
 		player = self._state.index[1]
-		action = self._deref_index(self._state.index)
-		self._mod_set_next_turn(player, [action])
+		action = [self._deref_index(self._state.index[:-1])]
+		action.extend(args)
+		self._mod_set_next_turn(player, action)
 
 		# Go back to the map view
 		self._mod_toggle_index()
@@ -732,8 +739,8 @@ class State(object):
 			pass
 
 		self.pause_coag = Coagulate(name="Paused",
-									tree=[	Nub(name="Quit", method=Game.co_quit),
-											Nub(name="Resume", method=Game.co_resume)],
+									tree=[	Coagulate(name="Quit", method=[Game.co_quit]),
+											Coagulate(name="Resume", method=[Game.co_resume])],
 									is_root=True)
 
 	def __repr__(self):
@@ -776,6 +783,7 @@ class Map(object):
 	Map.__str__(self)
 	Map.get_mobs(self)
 	Map.to_dict(self)
+	Map.yield_mobs(self)
 
 	Map._size
 	Map.grid
@@ -855,6 +863,40 @@ class Map(object):
 
 		# Return state
 		return state
+
+	def yield_mobs(self):
+		"""Yield all of the mobs in order of initiative and if they have a next turn defined."""
+
+		# Initialize to True to get the while loop started
+		more_mobs = True
+
+		while more_mobs:
+
+			fastest_mob = None
+
+			for mob in self.get_mobs():
+				if mob.next_turn == None:
+
+					# That mob has already moved
+					pass
+
+				elif fastest_mob == None:
+
+					# First one is automatically the fastest until deposed
+					fastest_mob = mob
+
+				elif (	mob.quanta["default:quanta:_initiative"] + mob.next_turn[0].quanta["default:quanta:_initiative"] > 
+						fastest_mob.quanta["default:quanta:_initiative"] + fastest_mob.next_turn[0].quanta["default:quanta:_initiative"]):
+
+					fastest_mob = mob
+
+			if fastest_mob == None:
+
+				more_mobs = False
+
+			else:
+
+				yield fastest_mob
 
 class Tile(object):
 	"""
@@ -966,12 +1008,14 @@ class Entity(object):
 	Entity._find_quanta(self)
 	Entity.to_dict(self)
 
+	Entity.characteristics*
 	Entity.coords
-	Entity.characteristics
-	Entity.dif_coag
+	Entity.dif_coag*
 	Entity.id
 	Entity.inventory
 	Entity.knowledge
+	Entity.qualita*
+	Entity.quanta*
 	Entity.status
 	"""
 
@@ -1010,7 +1054,9 @@ class Entity(object):
 
 			# Loading from a saved_state dict
 			self.id = saved_state["id"]
-			#self.dif_coag = load_from_dict(saved_state["dif_coag"])
+			#self.inventory = load_from_dict(saved_state["inventory"])
+			#self.knowledge = load_from_dict(saved_state["knowledge"])
+			#self.status = load_from_dict(saved_state["status"])
 
 		else:
 
@@ -1034,15 +1080,14 @@ class Entity(object):
 
 			human =  Status(name="Human", 
 							id_="default:status:human",
-							actions=[	[Action(name="Wait", id_="default:action:wait"), "True"],
-										[Action(name="Move North", id_="default:action:move_north"), "True"],
-										[Action(name="Move Northeast", id_="default:action:move_northeast"), "True"],
-										[Action(name="Move East", id_="default:action:move_east"), "True"],
-										[Action(name="Move Southeast", id_="default:action:move_southeast"), "True"],
-										[Action(name="Move South", id_="default:action:move_south"), "True"],
-										[Action(name="Move Southwest", id_="default:action:move_southwest"), "True"],
-										[Action(name="Move West", id_="default:action:move_west"), "True"],
-										[Action(name="Move Northwest", id_="default:action:move_northwest"), "True"]],
+							actions=[	[Action(name="Wait",
+												id_="default:action:wait",
+												quanta=[Quanta(name="Initiative", id_="default:quanta:_initiative", value="-999")]), "True"],
+										[Action(name="Walk",
+												id_="default:action:walk",
+												quanta=[Quanta(name="Initiative", id_="default:quanta:_initiative", value="0")],
+												meth_args=[	[DIR_NORTH], [DIR_NORTHEAST], [DIR_EAST], [DIR_SOUTHEAST],
+															[DIR_SOUTH], [DIR_SOUTHWEST], [DIR_WEST], [DIR_NORTHWEST]]), "True"]],
 							qualita_inate=[Qualita(name="Body Type", id_="default:qualita:body_type", value="default:qualita:body_type:humanoid")],
 							qualita_inherited=[	[	Qualita(name="Race: Human", 
 															id_="default:qualita:race", 
@@ -1052,10 +1097,12 @@ class Entity(object):
 															id_="default:qualita:living"), 
 													"True"]],
 							quanta_inate=[Quanta(name="Time", id_="default:quanta:_time", value=-1)],
-							quanta_inherited=[	[	Quanta(	name="Perm: Organism",
-															id_="default:quanta:_permeability",
-															value=1),
-													"True"]])
+							quanta_inherited=[	[Quanta(name="Perm: Organism",
+														id_="default:quanta:_permeability",
+														value=1), "True"],
+												[Quanta(name="Initiative",
+														id_="default:quanta:_initiative",
+														value=0), "True"]])
 
 			fireball = Concept(	name="Fireball",
 								id_="default:concept:fireball",
@@ -1077,16 +1124,17 @@ class Entity(object):
 
 			zombie =  Status(name="Zombie", 
 							id_="default:status:zombie",
-							actions=[	[Action(name="Wait", id_="default:action:wait"), "True"],
-										[Action(name="Move North", id_="default:action:move_north"), "True"],
-										[Action(name="Move Northeast", id_="default:action:move_northeast"), "True"],
-										[Action(name="Move East", id_="default:action:move_east"), "True"],
-										[Action(name="Move Southeast", id_="default:action:move_southeast"), "True"],
-										[Action(name="Move South", id_="default:action:move_south"), "True"],
-										[Action(name="Move Southwest", id_="default:action:move_southwest"), "True"],
-										[Action(name="Move West", id_="default:action:move_west"), "True"],
-										[Action(name="Move Northwest", id_="default:action:move_northwest"), "True"],
-										[Action(name="Zombie Bite", id_="default:action:zombie_bite"), "True"]],
+							actions=[	[Action(name="Wait",
+												id_="default:action:wait",
+												quanta=[Quanta(name="Initiative", id_="default:quanta:_initiative", value="-999")]), "True"],
+										[Action(name="Walk",
+												id_="default:action:walk",
+												quanta=[Quanta(name="Initiative", id_="default:quanta:_initiative", value="0")],
+												meth_args=[	[DIR_NORTH], [DIR_NORTHEAST], [DIR_EAST], [DIR_SOUTHEAST],
+															[DIR_SOUTH], [DIR_SOUTHWEST], [DIR_WEST], [DIR_NORTHWEST]]), "True"],
+										[Action(name="Zombie Bite",
+												id_="default:action:zombie_bite",
+												quanta=[Quanta(name="Initiative", id_="default:quanta:_initiative", value="-1")]), "True"]],
 							qualita_inate=[Qualita(name="Body Type", id_="default:qualita:body_type", value="default:qualita:body_type:humanoid")],
 							qualita_inherited=[	[	Qualita(name="Race: Zombie", 
 															id_="default:qualita:race", 
@@ -1096,10 +1144,12 @@ class Entity(object):
 															id_="default:qualita:undead"), 
 													"True"]],
 							quanta_inate=[Quanta(name="Time", id_="default:quanta:_time", value=-1)],
-							quanta_inherited=[	[	Quanta(	name="Perm: Organism",
-															id_="default:quanta:_permeability",
-															value=1),
-													"True"]])
+							quanta_inherited=[	[Quanta(name="Perm: Organism",
+														id_="default:quanta:_permeability",
+														value=1), "True"],
+												[Quanta(name="Initiative",
+														id_="default:quanta:_initiative",
+														value=0), "True"]])
 
 			self.status.append(copy.deepcopy(zombie))
 
@@ -1147,16 +1197,16 @@ class Entity(object):
 			self.status = Coagulate(name="Status", tree=[])
 			self.knowledge = Coagulate(name="Knowledge", tree=[])
 
-			matter =  Status(name="Matter", 
-							id_="default:status:matter",
-							actions=[],
-							qualita_inate=[],
-							qualita_inherited=[],
-							quanta_inate=[Quanta(name="Time", id_="default:quanta:_time", value=-1)],
-							quanta_inherited=[	[	Quanta(	name="Perm: Solid",
-															id_="default:quanta:_permeability",
-															value=0),
-													"True"]])
+			matter =  Status(	name="Matter", 
+								id_="default:status:matter",
+								actions=[],
+								qualita_inate=[],
+								qualita_inherited=[],
+								quanta_inate=[Quanta(name="Time", id_="default:quanta:_time", value=-1)],
+								quanta_inherited=[	[	Quanta(	name="Perm: Solid",
+																id_="default:quanta:_permeability",
+																value=0),
+														"True"]])
 
 			self.status.append(copy.deepcopy(matter))
 		# *** DEBUG ***
@@ -1233,8 +1283,10 @@ class Entity(object):
 
 		# Construct state
 		state["_type"] = "Entity"
-		state["dif_coag"] = self.dif_coag.to_dict()
 		state["id"] = self.id
+		state["inventory"] = self.inventory.to_dict()
+		state["knowledge"] = self.knowledge.to_dict()
+		state["status"] = self.status.to_dict()
 
 		# Return state
 		return state
@@ -1274,7 +1326,7 @@ class Mob(Entity):
 	Mob._find_actions(self)
 	Mob.to_dict(self)
 
-	Mob.actions
+	Mob.actions*
 	Mob.ai
 	Mob.next_turn
 
@@ -1372,6 +1424,7 @@ class Coagulate(object):
 
 	Coagulate._tree
 	Coagulate.is_root
+	Coagulate.method
 	Coagulate.name
 	"""
 
@@ -1414,7 +1467,7 @@ class Coagulate(object):
 
 			raise TypeError("Coagulate indecies/keys must be integers/strings, not " + str(type(index))) 
 
-	def __init__(self, name="", tree=(), is_root=False, saved_state=None):
+	def __init__(self, name="", tree=(), method=[Game.co_pass], is_root=False, saved_state=None):
 		"""
 		Initialize the Coagulate, perhaps from a saved state.
 
@@ -1424,8 +1477,8 @@ class Coagulate(object):
 		if saved_state:
 
 			# Loading from a saved_state dict
-			self.name = saved_state["name"]
 			self.is_root = saved_state["is_root"]
+			self.name = saved_state["name"]
 
 			# Construct tree
 			self._tree = []
@@ -1434,11 +1487,19 @@ class Coagulate(object):
 
 				self._tree.append(load_from_dict(coag))
 
+			# Construct method
+			self.method = []
+			self.method.append(Game.__dict__[saved_state["method"][0]])
+
+			try: self.method.extend(saved_state["method"][1:])
+			except IndexError: pass
+
 		else:
 
 			self._tree = tree
-			self.name = name
 			self.is_root = is_root
+			self.method = method
+			self.name = name
 
 	def __len__(self):
 		"""Get the length of the Coagulate."""
@@ -1472,53 +1533,23 @@ class Coagulate(object):
 		# Fix tree
 		saved_tree = []
 
-		for differentia in self._tree:
+		for coag in self._tree:
 
-			saved_tree.append(differentia.to_dict())
+			saved_tree.append(coag.to_dict())
+
+		# Fix method
+		saved_method = [self.method[0].__name__]
+
+		try: saved_method.extend(self.method[1:])
+		except IndexError: pass
+		# CHANGE ALL METHODS TO LISTS (OR TUPLES)
 
 		# Construct state
 		state["_type"] = "Coagulate"
 		state["tree"] = saved_tree
-		state["name"] = self.name
 		state["is_root"] = self.is_root
-
-		# Return state
-		return state
-
-class Nub(Coagulate):
-	"""
-	A bit in a coagulate just made for running a method.
-	
-	Nub.__init__(self, name="", method=Game.co_pass, saved_state=None)
-	Nub.to_dict(self)
-
-	Nub.method
-
-	Also includes some member variables from Coagulate.
-	"""
-
-	def __init__(self, name="", method=Game.co_pass, saved_state=None):
-		"""Initialize the Nub, perhaps from a saved state."""
-
-		super(Nub, self).__init__(name, (), False, saved_state)
-
-		if saved_state:
-
-			# Loading from a saved_state dict
-			self.method = Game.__dict__[saved_state["method"]]
-
-		else:
-
-			self.method = method
-
-	def to_dict(self):
-		"""Create a JSON-serializable dict representation of the Nub."""
-
-		state = super(Nub, self).to_dict()
-
-		# Construct state
-		state["_type"] = "Nub"
-		state["method"] = self.method.__name__
+		state["method"] = saved_method
+		state["name"] = self.name
 
 		# Return state
 		return state
@@ -1527,30 +1558,27 @@ class Differentia(Coagulate):
 	"""
 	Any game element goes inside of a coagulate.
 	
-	__init__(self, name="", id_="", tree=(), method=Game.co_pass, is_root=False, saved_state=None)
+	__init__(self, name="", id_="", tree=(), method=[Game.co_pass], is_root=False, saved_state=None)
 	Differentia.to_dict(self)
 
 	Differentia.id
-	Differentia.method
 
 	Also includes some member variables from Coagulate.
 	"""
 
-	def __init__(self, name="", id_="", tree=(), method=Game.co_pass, is_root=False, saved_state=None):
+	def __init__(self, name="", id_="", tree=(), method=[Game.co_pass], is_root=False, saved_state=None):
 		"""Initialize the Differentia, perhaps from a saved state."""
 
-		super(Differentia, self).__init__(name, tree, is_root, saved_state)
+		super(Differentia, self).__init__(name, tree, method, is_root, saved_state)
 
 		if saved_state:
 
 			# Loading from a saved_state dict
 			self.id = saved_state["id"]	
-			self.method = Game.__dict__[saved_state["method"]]
 
 		else:
 
 			self.id = id_
-			self.method = method
 
 	def to_dict(self):
 		"""Create a JSON-serializable dict representation of the Differentia."""
@@ -1560,7 +1588,6 @@ class Differentia(Coagulate):
 		# Construct state
 		state["_type"] = "Differentia"
 		state["id"] = self.id
-		state["method"] = self.method.__name__
 
 		# Return state
 		return state
@@ -1570,14 +1597,14 @@ class Figment(Differentia):
 	A figment of the game, such as an item, status, or concept.
 
 	Figment.__getattr__(self, attr)
-	Figment.__init__(	self, name="", id_="", method=Game.co_pass, actions=[], qualita_inate=[], qualita_inherited=[], 
+	Figment.__init__(	self, name="", id_="", actions=[], qualita_inate=[], qualita_inherited=[], 
 						quanta_inate=[], quanta_inherited=[], is_root=False, saved_state=None)
 	Figment.to_dict(self)
 
 	Figment.actions
-	Figment.qualita_inate
+	Figment.qualita_inate*
 	Figment.qualita_inherited
-	Figment.quanta_inate
+	Figment.quanta_inate*
 	Figment.quanta_inherited
 	"""
 
@@ -1596,17 +1623,16 @@ class Figment(Differentia):
 
 			super(Figment, self).__getattr__(attr)
 
-	def __init__(	self, name="", id_="", method=Game.co_pass, actions=[], qualita_inate=[], qualita_inherited=[], 
+	def __init__(	self, name="", id_="", actions=[], qualita_inate=[], qualita_inherited=[], 
 					quanta_inate=[], quanta_inherited=[], is_root=False, saved_state=None):
 		"""Initialze the Figment, perhaps from a saved state."""
 
-		super(Figment, self).__init__(name, id_, [], method, is_root, saved_state)
+		super(Figment, self).__init__(name, id_, [], [Game.co_pass], is_root, saved_state)
 
 		if saved_state:
 
 			# Loading from a saved_state dict
-			self._tree.append(load_from_dict(saved_state["qualita_inate"]))
-			self._tree.append(load_from_dict(saved_state["quanta_inate"]))
+			# Inate quanta and qualita should have already been loaded from _tree
 			
 			# Construct inherit lists
 			self.actions = []
@@ -1682,9 +1708,7 @@ class Figment(Differentia):
 		# Construct state
 		state["_type"] = "Figment"
 		state["actions"] = saved_actions
-		state["qualita_inate"] = self.qualita_inate.to_dict()
 		state["qualita_inherited"] = saved_qualita_inherited
-		state["quanta_inate"] = self.quanta_inate.to_dict()
 		state["quanta_inherited"] = saved_quanta_inherited
 
 		# Return state
@@ -1694,16 +1718,16 @@ class Item(Figment):
 	"""
 	An item, something which can be picked up and dropped
 
-	Item.__init__(	self, name="", id_="", method=Game.co_pass, actions=[], qualita_inate=[], qualita_inherited=[], 
+	Item.__init__(	self, name="", id_="", actions=[], qualita_inate=[], qualita_inherited=[], 
 					quanta_inate=[], quanta_inherited=[], is_root=False, saved_state=None)
 	Item.to_dict(self)
 	"""
 
-	def __init__(	self, name="", id_="", method=Game.co_pass, actions=[], qualita_inate=[], qualita_inherited=[], 
+	def __init__(	self, name="", id_="", actions=[], qualita_inate=[], qualita_inherited=[], 
 					quanta_inate=[], quanta_inherited=[], is_root=False, saved_state=None):
 		"""Initialze the Item, perhaps from a saved state."""
 
-		super(Item, self).__init__(	name, id_, method, actions, qualita_inate, qualita_inherited, quanta_inate, 
+		super(Item, self).__init__(	name, id_, actions, qualita_inate, qualita_inherited, quanta_inate, 
 									quanta_inherited, is_root, saved_state)
 
 	def to_dict(self):
@@ -1721,16 +1745,16 @@ class Status(Figment):
 	"""
 	A physical descriptor of an entity
 
-	Status.__init__(	self, name="", id_="", method=Game.co_pass, actions=[], qualita_inate=[], qualita_inherited=[], 
+	Status.__init__(	self, name="", id_="", actions=[], qualita_inate=[], qualita_inherited=[], 
 						quanta_inate=[], quanta_inherited=[], is_root=False, saved_state=None)
 	Status.to_dict(self)
 	"""
 
-	def __init__(	self, name="", id_="", method=Game.co_pass, actions=[], qualita_inate=[], qualita_inherited=[], 
+	def __init__(	self, name="", id_="", actions=[], qualita_inate=[], qualita_inherited=[], 
 					quanta_inate=[], quanta_inherited=[], is_root=False, saved_state=None):
 		"""Initialze the Status, perhaps from a saved state."""
 
-		super(Status, self).__init__(	name, id_, method, actions, qualita_inate, qualita_inherited, quanta_inate, 
+		super(Status, self).__init__(	name, id_, actions, qualita_inate, qualita_inherited, quanta_inate, 
 										quanta_inherited, is_root, saved_state)
 	def to_dict(self):
 		"""Create a JSON-serializable dict representation of the Status."""
@@ -1747,16 +1771,16 @@ class Concept(Figment):
 	"""
 	A non-physical descriptor of an entity.
 
-	Concept.__init__(	self, name="", id_="", method=Game.co_pass, actions=[], qualita_inate=[], qualita_inherited=[], 
+	Concept.__init__(	self, name="", id_="", actions=[], qualita_inate=[], qualita_inherited=[], 
 						quanta_inate=[], quanta_inherited=[], is_root=False, saved_state=None)
 	Concept.to_dict(self)
 	"""
 
-	def __init__(	self, name="", id_="", method=Game.co_pass, actions=[], qualita_inate=[], qualita_inherited=[], 
+	def __init__(	self, name="", id_="", actions=[], qualita_inate=[], qualita_inherited=[], 
 					quanta_inate=[], quanta_inherited=[], is_root=False, saved_state=None):
 		"""Initialze the Concept, perhaps from a saved state."""
 
-		super(Concept, self).__init__(	name, id_, method, actions, qualita_inate, qualita_inherited, quanta_inate, 
+		super(Concept, self).__init__(	name, id_, actions, qualita_inate, qualita_inherited, quanta_inate, 
 										quanta_inherited, is_root, saved_state)
 
 	def to_dict(self):
@@ -1774,16 +1798,16 @@ class Characteristic(Differentia):
 	"""
 	A single characteristic granted by a Figment
 
-	Characteristic.__init__(self, name="", id_="", value=None, tree=(), method=Game.co_pass, is_root=False, saved_state=None)
+	Characteristic.__init__(self, name="", id_="", value=None, is_root=False, saved_state=None)
 	Characteristic.to_dict(self)
 
 	Characteristic._value
 	"""
 
-	def __init__(self, name="", id_="", value=None, tree=(), method=Game.co_pass, is_root=False, saved_state=None):
+	def __init__(self, name="", id_="", value=None, is_root=False, saved_state=None):
 		"""Initialze the Characteristic, perhaps from a saved state."""
 
-		super(Characteristic, self).__init__(name, id_, tree, method, is_root, saved_state)
+		super(Characteristic, self).__init__(name, id_, (), [Game.co_pass], is_root, saved_state)
 
 		if saved_state:
 
@@ -1810,14 +1834,14 @@ class Qualita(Characteristic):
 	"""
 	A qualitative Characteristic, with a bool or str value
 
-	Qualita.__init__(self, name="", id_="", value=True, tree=(), method=Game.co_pass, is_root=False, saved_state=None)
+	Qualita.__init__(self, name="", id_="", value=True, is_root=False, saved_state=None)
 	Qualita.to_dict(self)
 	"""
 
-	def __init__(self, name="", id_="", value=True, tree=(), method=Game.co_pass, is_root=False, saved_state=None):
+	def __init__(self, name="", id_="", value=True, is_root=False, saved_state=None):
 		"""Initialze the Qualita, perhaps from a saved state."""
 
-		super(Qualita, self).__init__(name, id_, value, tree, method, is_root, saved_state)
+		super(Qualita, self).__init__(name, id_, value, is_root, saved_state)
 
 	def to_dict(self):
 		"""Create a JSON-serializable dict representation of the Qualita."""
@@ -1834,16 +1858,41 @@ class Quanta(Characteristic):
 	"""
 	A quantitative Characteristic
 
+	Quanta.__add__(self, other)
 	Quanta.__eq__(self, other)
+	Quanta.__floordiv__(self, other)
 	Quanta.__ge__(self, other)
 	Quanta.__gt__(self, other)
-	Quanta.__init__(self, name="", id_="", value=0, tree=(), method=Game.co_pass, is_root=False, saved_state=None)
+	Quanta.__init__(self, name="", id_="", value=0, tree=(), method=[Game.co_pass], is_root=False, saved_state=None)
 	Quanta.__int__(self)
 	Quanta.__le__(self, other)
 	Quanta.__lt__(self, other)
+	Quanta.__mod__(self, other)
+	Quanta.__mul__(self, other)
 	Quanta.__ne__(self, other)
+	Quanta.__pow__(self, other)
+	Quanta.__rfloordiv__(self, other)
+	Quanta.__rmod__(self, other)
+	Quanta.__rpow__(self, other)
+	Quanta.__rsub__(self, other)
+	Quanta.__sub__(self, other)
 	Quanta.to_dict(self)
 	"""
+
+	def __add__(self, other):
+		"""Add a Quanta and another Quanta or an int, returning an int."""
+
+		if type(other) == int:
+
+			return int(self) + other
+
+		elif type(other) == Quanta:
+
+			return int(self) + int(other)
+
+		else:
+
+			raise TypeError("unsupported operand type(s) for +: 'Quanta' and '" + str(type(other)) + "'")
 
 	def __eq__(self, other):
 		"""Check if this Quanta has equal value to an other."""
@@ -1859,6 +1908,21 @@ class Quanta(Characteristic):
 		else:
 
 			return NotImplemented
+
+	def __floordiv__(self, other):
+		"""Take the floored quotient of a Quanta and another Quanta or an int, returning an int."""
+
+		if type(other) == int:
+
+			return int(self) // other
+
+		elif type(other) == Quanta:
+
+			return int(self) // int(other)
+
+		else:
+
+			raise TypeError("unsupported operand type(s) for //: 'Quanta' and '" + str(type(other)) + "'")
 
 	def __ge__(self, other):
 		"""Check if this Quanta has a greater or equal value than an other."""
@@ -1890,10 +1954,10 @@ class Quanta(Characteristic):
 
 			return NotImplemented
 
-	def __init__(self, name="", id_="", value=0, tree=(), method=Game.co_pass, is_root=False, saved_state=None):
+	def __init__(self, name="", id_="", value=0, is_root=False, saved_state=None):
 		"""Initialze the Quanta, perhaps from a saved state."""
 
-		super(Quanta, self).__init__(name, id_, value, tree, method, is_root, saved_state)
+		super(Quanta, self).__init__(name, id_, value, is_root, saved_state)
 
 	def __int__(self):
 		"""Get an integer representation of the Quanta."""
@@ -1930,6 +1994,36 @@ class Quanta(Characteristic):
 
 			return NotImplemented
 
+	def __mod__(self, other):
+		"""Get the modulo of a Quanta and another Quanta or an int, returning an int."""
+
+		if type(other) == int:
+
+			return int(self) % other
+
+		elif type(other) == Quanta:
+
+			return int(self) % int(other)
+
+		else:
+
+			raise TypeError("unsupported operand type(s) for %: 'Quanta' and '" + str(type(other)) + "'")
+
+	def __mul__(self, other):
+		"""Multiply a Quanta and another Quanta or an int, returning an int."""
+
+		if type(other) == int:
+
+			return int(self) * other
+
+		elif type(other) == Quanta:
+
+			return int(self) * int(other)
+
+		else:
+
+			raise TypeError("unsupported operand type(s) for *: 'Quanta' and '" + str(type(other)) + "'")
+
 	def __ne__(self, other):
 		"""Check if this Quanta has unequal value to an other."""
 
@@ -1944,6 +2038,96 @@ class Quanta(Characteristic):
 		else:
 
 			return NotImplemented
+
+	def __pow__(self, other):
+		"""Take a Quanta to the power of another Quanta or an int, returning an int."""
+
+		if type(other) == int:
+
+			return int(self) ** other
+
+		elif type(other) == Quanta:
+
+			return int(self) ** int(other)
+
+		else:
+
+			raise TypeError("unsupported operand type(s) for **: 'Quanta' and '" + str(type(other)) + "'")
+
+	def __rfloordiv__(self, other):
+		"""Take the floored quotient a Quanta or int and this Quanta, returning an int."""
+
+		if type(other) == int:
+
+			return other // int(self)
+
+		elif type(other) == Quanta:
+
+			return int(other) // int(self)
+
+		else:
+
+			raise TypeError("unsupported operand type(s) for //: '" + str(type(other)) + "' and 'Quanta'")
+
+	def __rmod__(self, other):
+		"""Take the modulo of Quanta or int and this Quanta, returning an int."""
+
+		if type(other) == int:
+
+			return other % int(self)
+
+		elif type(other) == Quanta:
+
+			return int(other) % int(self)
+
+		else:
+
+			raise TypeError("unsupported operand type(s) for %: '" + str(type(other)) + "' and 'Quanta'")
+
+	def __rpow__(self, other):
+		"""Take a Quanta or int to the power of this Quanta, returning an int."""
+
+		if type(other) == int:
+
+			return other ** int(self)
+
+		elif type(other) == Quanta:
+
+			return int(other) ** int(self)
+
+		else:
+
+			raise TypeError("unsupported operand type(s) for **: '" + str(type(other)) + "' and 'Quanta'")
+
+	def __rsub__(self, other):
+		"""Subtract a Quanta or int and this Quanta, returning an int."""
+
+		if type(other) == int:
+
+			return other - int(self)
+
+		elif type(other) == Quanta:
+
+			return int(other) - int(self)
+
+		else:
+
+			raise TypeError("unsupported operand type(s) for -: '" + str(type(other)) + "' and 'Quanta'")
+
+	def __sub__(self, other):
+		"""Subtract a Quanta from another Quanta or an int, returning an int."""
+
+		if type(other) == int:
+
+			return int(self) - other
+
+		elif type(other) == Quanta:
+
+			return int(self) - int(other)
+
+		else:
+
+			raise TypeError("unsupported operand type(s) for -: 'Quanta' and '" + str(type(other)) + "'")
 
 	def to_dict(self):
 		"""Create a JSON-serializable dict representation of the Quanta."""
@@ -1960,14 +2144,55 @@ class Action(Differentia):
 	"""
 	A single action granted by a Figment
 
-	Action.__init__(self, name="", id_="", tree=(), method=Game.co_do_action, is_root=False, saved_state=None)
+	Action.__getattr__(self, attr)
+	Action.__init__(self, name="", id_="", tree=(), method=[Game.co_do_action], is_root=False, saved_state=None)
 	Action.to_dict(self)
-	"""
 
-	def __init__(self, name="", id_="", tree=(), method=Game.co_do_action, is_root=False, saved_state=None):
+	Action.qualita*
+	Action.quanta*
+	"""
+	def __getattr__(self, attr):
+		"""Get an attribute, but do a special behavior with characteristics."""
+
+		if attr == "qualita":
+
+			return self._tree[0]
+
+		elif attr == "quanta":
+
+			return self._tree[1]
+
+		else:
+
+			super(Action, self).__getattr__(attr)
+
+	def __init__(self, name="", id_="", qualita=[], quanta=[], meth_args=[[]], is_root=False, saved_state=None):
 		"""Initialze the Action, perhaps from a saved state."""
 
-		super(Action, self).__init__(name, id_, tree, method, is_root, saved_state)
+		super(Action, self).__init__(name, id_, [], [Game.co_pass], is_root, saved_state)
+
+		if saved_state:
+
+			# Loading from a saved_state dict
+			pass
+
+		else:
+
+			self._tree.append(Coagulate(name="Qualita",
+										tree=qualita,
+										is_root=False))
+			self._tree.append(Coagulate(name="Quanta",
+										tree=quanta,
+										is_root=False))
+
+			# *** DEBUG ***
+			for arg in meth_args:
+
+				
+				method = [Game.co_do_action]
+				method.extend(arg)
+				self._tree.append(Coagulate(name="Do", method=method))
+			# *** DEBUG ***
 
 	def to_dict(self):
 		"""Create a JSON-serializable dict representation of the Action."""

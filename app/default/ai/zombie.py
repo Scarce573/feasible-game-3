@@ -2,15 +2,23 @@ import random
 
 from ...ai_super import AI
 
-DIR_ACTION = {	(0, 0): "default:action:wait",
-				(0, -1): "default:action:move_north",
-				(1, -1): "default:action:move_northeast",
-				(1, 0): "default:action:move_east",
-				(1, 1): "default:action:move_southeast",
-				(0, 1): "default:action:move_south",
-				(-1, 1): "default:action:move_southwest",
-				(-1, 0): "default:action:move_west",
-				(-1, -1): "default:action:move_northwest"}
+DIR_NORTH = 0
+DIR_NORTHEAST = 1
+DIR_EAST = 2
+DIR_SOUTHEAST = 3
+DIR_SOUTH = 4
+DIR_SOUTHWEST = 5
+DIR_WEST = 6
+DIR_NORTHWEST = 7
+
+DIR_ACTION = {	(0, -1): DIR_NORTH,
+				(1, -1): DIR_NORTHEAST,
+				(1, 0): DIR_EAST,
+				(1, 1): DIR_SOUTHEAST,
+				(0, 1): DIR_SOUTH,
+				(-1, 1): DIR_SOUTHWEST,
+				(-1, 0): DIR_WEST,
+				(-1, -1): DIR_NORTHWEST}
 
 class DefAI(AI):
 	"""
@@ -63,9 +71,15 @@ class DefAI(AI):
 
 		direction = (direction_x, direction_y)
 
-		if DIR_ACTION[direction] == "default:action:wait" and found_flag:
+		if direction == (0, 0) and found_flag:
 
 			return [mob.actions["default:action:zombie_bite"]]
 
-		return [mob.actions[DIR_ACTION[direction]]]
+		elif direction == (0, 0) and not found_flag:
+
+			return [mob.actions["default:action:wait"]]
+
+		else:
+
+			return [mob.actions["default:action:walk"], DIR_ACTION[direction]]
 		# *** DEBUG ***
