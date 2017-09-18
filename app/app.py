@@ -224,7 +224,14 @@ class Game(object):
 		with open(path, 'r') as state_file:
 
 			self._state = load_from_dict(json_loads_str(state_file.read()))
-		# *** DEUBG ***
+
+		#path = os.path.join(	os.path.dirname(__file__), 
+		#						"debug/state2.json")
+
+		#with open(path, 'w') as state_save_file:
+
+		#	state_save_file.write(str(self._state))
+		# *** DEBUG ***
 		
 		# Build controls
 		self._build_controls()
@@ -763,13 +770,22 @@ class State(object):
 
 		if type(self.index[1]) == Mob:
 
-			saved_index[1] = [self.index[1].coords, self.index[1].quanta["default:quanta:_permeability"]]
+			saved_index[1] = [self.index[1].coords, int(self.index[1].quanta["default:quanta:_permeability"])]
+
+		# Fix stored_index[1] if necessary
+		saved_stored_index = copy.copy(self.stored_index)
+
+		if type(self.stored_index[1]) == Mob:
+
+			saved_stored_index[1] = [self.stored_index[1].coords, int(self.stored_index[1].quanta["default:quanta:_permeability"])]
 
 		# Construct state
 		state["_type"] = "State"
 		state["index"] = saved_index
 		state["map"] = self.map.to_dict()
 		state["message_log"] = self.message_log
+		state["pause_coag"] = self.pause_coag.to_dict()
+		state["stored_index"] = saved_stored_index
 
 		# Return state
 		return state
@@ -873,7 +889,6 @@ class Map(object):
 		while more_mobs:
 
 			fastest_mob = None
-
 			for mob in self.get_mobs():
 				if mob.next_turn == None:
 
@@ -1054,162 +1069,15 @@ class Entity(object):
 
 			# Loading from a saved_state dict
 			self.id = saved_state["id"]
-			#self.inventory = load_from_dict(saved_state["inventory"])
-			#self.knowledge = load_from_dict(saved_state["knowledge"])
-			#self.status = load_from_dict(saved_state["status"])
+			self.inventory = load_from_dict(saved_state["inventory"])
+			self.knowledge = load_from_dict(saved_state["knowledge"])
+			self.status = load_from_dict(saved_state["status"])
 
 		else:
 
 			pass
 
 		self.coords = coords
-		# *** DEBUG ***
-		if self.id == "default:mob:player":
-
-			self.inventory = Coagulate(name="Inventory", tree=[])
-			self.status = Coagulate(name="Status", tree=[])
-			self.knowledge = Coagulate(name="Knowledge", tree=[])
-
-			sword = Item(	name="Sword", 
-							id_="default:item:sword",
-							actions=[],
-							qualita_inate=[Qualita(name="Iron", id_="default:quanta:iron")],
-							qualita_inherited=[],
-							quanta_inate=[],
-							quanta_inherited=[])
-
-			human =  Status(name="Human", 
-							id_="default:status:human",
-							actions=[	[Action(name="Wait",
-												id_="default:action:wait",
-												quanta=[Quanta(name="Initiative", id_="default:quanta:_initiative", value="-999")]), "True"],
-										[Action(name="Walk",
-												id_="default:action:walk",
-												quanta=[Quanta(name="Initiative", id_="default:quanta:_initiative", value="0")],
-												meth_args=[	[DIR_NORTH], [DIR_NORTHEAST], [DIR_EAST], [DIR_SOUTHEAST],
-															[DIR_SOUTH], [DIR_SOUTHWEST], [DIR_WEST], [DIR_NORTHWEST]]), "True"]],
-							qualita_inate=[Qualita(name="Body Type", id_="default:qualita:body_type", value="default:qualita:body_type:humanoid")],
-							qualita_inherited=[	[	Qualita(name="Race: Human", 
-															id_="default:qualita:race", 
-															value="default:qualita:race:human"), 
-													"True"],
-												[	Qualita(name="Living", 
-															id_="default:qualita:living"), 
-													"True"]],
-							quanta_inate=[Quanta(name="Time", id_="default:quanta:_time", value=-1)],
-							quanta_inherited=[	[Quanta(name="Perm: Organism",
-														id_="default:quanta:_permeability",
-														value=1), "True"],
-												[Quanta(name="Initiative",
-														id_="default:quanta:_initiative",
-														value=0), "True"]])
-
-			fireball = Concept(	name="Fireball",
-								id_="default:concept:fireball",
-								actions=[],
-								qualita_inate=[Quanta(name="Spell", id_="default:quanta:spell")],
-								qualita_inherited=[],
-								quanta_inate=[Quanta(name="Radius", id_="default:quanta:radius", value=1)],
-								quanta_inherited=[])
-
-			self.inventory.append(copy.deepcopy(sword))
-			self.status.append(copy.deepcopy(human))
-			self.knowledge.append(copy.deepcopy(fireball))
-
-		elif self.id == "default:mob:zombie":
-
-			self.inventory = Coagulate(name="Inventory", tree=[])
-			self.status = Coagulate(name="Status", tree=[])
-			self.knowledge = Coagulate(name="Knowledge", tree=[])
-
-			zombie =  Status(name="Zombie", 
-							id_="default:status:zombie",
-							actions=[	[Action(name="Wait",
-												id_="default:action:wait",
-												quanta=[Quanta(name="Initiative", id_="default:quanta:_initiative", value="-999")]), "True"],
-										[Action(name="Walk",
-												id_="default:action:walk",
-												quanta=[Quanta(name="Initiative", id_="default:quanta:_initiative", value="0")],
-												meth_args=[	[DIR_NORTH], [DIR_NORTHEAST], [DIR_EAST], [DIR_SOUTHEAST],
-															[DIR_SOUTH], [DIR_SOUTHWEST], [DIR_WEST], [DIR_NORTHWEST]]), "True"],
-										[Action(name="Zombie Bite",
-												id_="default:action:zombie_bite",
-												quanta=[Quanta(name="Initiative", id_="default:quanta:_initiative", value="-1")]), "True"]],
-							qualita_inate=[Qualita(name="Body Type", id_="default:qualita:body_type", value="default:qualita:body_type:humanoid")],
-							qualita_inherited=[	[	Qualita(name="Race: Zombie", 
-															id_="default:qualita:race", 
-															value="default:qualita:race:zombie"), 
-													"True"],
-												[	Qualita(name="Undead", 
-															id_="default:qualita:undead"), 
-													"True"]],
-							quanta_inate=[Quanta(name="Time", id_="default:quanta:_time", value=-1)],
-							quanta_inherited=[	[Quanta(name="Perm: Organism",
-														id_="default:quanta:_permeability",
-														value=1), "True"],
-												[Quanta(name="Initiative",
-														id_="default:quanta:_initiative",
-														value=0), "True"]])
-
-			self.status.append(copy.deepcopy(zombie))
-
-		elif self.id == "default:nonmob:grass":
-
-			self.inventory = Coagulate(name="Inventory", tree=[])
-			self.status = Coagulate(name="Status", tree=[])
-			self.knowledge = Coagulate(name="Knowledge", tree=[])
-
-			grass =  Status(name="Grass", 
-							id_="default:status:grass",
-							actions=[],
-							qualita_inate=[],
-							qualita_inherited=[],
-							quanta_inate=[Quanta(name="Time", id_="default:quanta:_time", value=-1)],
-							quanta_inherited=[	[	Quanta(	name="Perm: Solid",
-															id_="default:quanta:_permeability",
-															value=0),
-													"True"]])
-
-			self.status.append(copy.deepcopy(grass))
-
-		elif self.id == "default:nonmob:stone":
-
-			self.inventory = Coagulate(name="Inventory", tree=[])
-			self.status = Coagulate(name="Status", tree=[])
-			self.knowledge = Coagulate(name="Knowledge", tree=[])
-
-			stone =  Status(name="Stone", 
-							id_="default:status:stone",
-							actions=[],
-							qualita_inate=[],
-							qualita_inherited=[],
-							quanta_inate=[Quanta(name="Time", id_="default:quanta:_time", value=-1)],
-							quanta_inherited=[	[	Quanta(	name="Perm: Solid",
-															id_="default:quanta:_permeability",
-															value=0),
-													"True"]])
-
-			self.status.append(copy.deepcopy(stone))
-
-		else:
-
-			self.inventory = Coagulate(name="Inventory", tree=[])
-			self.status = Coagulate(name="Status", tree=[])
-			self.knowledge = Coagulate(name="Knowledge", tree=[])
-
-			matter =  Status(	name="Matter", 
-								id_="default:status:matter",
-								actions=[],
-								qualita_inate=[],
-								qualita_inherited=[],
-								quanta_inate=[Quanta(name="Time", id_="default:quanta:_time", value=-1)],
-								quanta_inherited=[	[	Quanta(	name="Perm: Solid",
-																id_="default:quanta:_permeability",
-																value=0),
-														"True"]])
-
-			self.status.append(copy.deepcopy(matter))
-		# *** DEBUG ***
 
 	def __repr__(self):
 		"""Return a syntactically correct string representation of the Entity based off of to_dict."""
@@ -1489,10 +1357,16 @@ class Coagulate(object):
 
 			# Construct method
 			self.method = []
-			self.method.append(Game.__dict__[saved_state["method"][0]])
 
-			try: self.method.extend(saved_state["method"][1:])
-			except IndexError: pass
+			for method in saved_state["method"]:
+				if type(method) == str:
+					if method.find('$') != -1:
+
+						self.method.append(Game.__dict__[method[method.index('$') + 1:]])
+
+				else:
+
+					self.method.append(method)
 
 		else:
 
@@ -1538,11 +1412,16 @@ class Coagulate(object):
 			saved_tree.append(coag.to_dict())
 
 		# Fix method
-		saved_method = [self.method[0].__name__]
+		saved_method = []
 
-		try: saved_method.extend(self.method[1:])
-		except IndexError: pass
-		# CHANGE ALL METHODS TO LISTS (OR TUPLES)
+		for method in self.method:
+			if callable(method):
+
+				saved_method.append('$' + method.__name__)
+
+			else:
+
+				saved_method.append(method)
 
 		# Construct state
 		state["_type"] = "Coagulate"
@@ -1593,7 +1472,7 @@ class Differentia(Coagulate):
 		return state
 
 class Figment(Differentia):
-	"""
+	"""m
 	A figment of the game, such as an item, status, or concept.
 
 	Figment.__getattr__(self, attr)
@@ -1651,14 +1530,14 @@ class Figment(Differentia):
 				qualita = []
 				qualita.append(load_from_dict(saved_qualita[0]))
 				qualita.extend(saved_qualita[1:])
-				self.actions.append(qualita)
+				self.qualita_inherited.append(qualita)
 
 			for saved_quanta in saved_state["quanta_inherited"]:
 
 				quanta = []
 				quanta.append(load_from_dict(saved_quanta[0]))
 				quanta.extend(saved_quanta[1:])
-				self.actions.append(quanta)
+				self.quanta_inherited.append(quanta)
 
 		else:
 
@@ -2143,6 +2022,12 @@ class Quanta(Characteristic):
 class Action(Differentia):
 	"""
 	A single action granted by a Figment
+thod = self._deref_index(self._state.index).method
+
+	 		try: args = method[1:]
+	 		except IndexError: args = []
+			
+			method[0](self, *args)
 
 	Action.__getattr__(self, attr)
 	Action.__init__(self, name="", id_="", tree=(), method=[Game.co_do_action], is_root=False, saved_state=None)
