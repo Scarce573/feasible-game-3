@@ -188,14 +188,15 @@ class Game(object):
 	Game._io_move_south(self)
 	Game._io_move_east(self)
 	Game._io_pause(self)
-	Game._mod_change_index(self, index=0, to_value=None, set_all=False, stored_index=False)
 	Game._mod_console_add_char(self, char)
 	Game._mod_console_new_message(self)
 	Game._mod_console_post_message(self, message)
 	Game._mod_console_run_message(self)
+	Game._mod_index_edit(self, index=0, to_value=None, set_all=False)
+	Game._mod_index_pop(self)
+	Game._mod_index_push(self, index)
 	Game._mod_move(self, mob, to_coords)
 	Game._mod_set_next_turn(self, mob, action)
-	Game._mod_toggle_index(self)
 	Game._stop(self)
 	Game._turn(self)
 	Game.co_do_action(self)
@@ -209,6 +210,21 @@ class Game(object):
 	Game._app
 	Game._controls
 	Game._state
+
+	WORKING:
+	Game._io_pmt_back(self)
+	Game._io_pmt_dir_north(self)
+	Game._io_pmt_dir_west(self)
+	Game._io_pmt_dir_south(self)
+	Game._io_pmt_dir_east(self)
+	Game._mod_prompt_input(self, input)
+	Game._pend_co_do_action(self, *args)
+	Game._prompt_start(self, pend_func, prompts, allow_exit=False)
+	Game._prompt_back(self)
+	Game.pmt_direction(self, promptspace)
+	- The Game._io_pmt_* subspace is for i/o functions spectific to prompts
+	- The Game._pend_* namespace is for functions which are called when a prompt finishes
+	- The Game.pmt_* namespace is for functions that set the index up for a prompt
 	"""
 
 	def __init__(self, app, options):
@@ -279,10 +295,10 @@ class Game(object):
 								"pause": None}
 
 		# The controls for the map view
-		if self._state.index[0] == VIEW_MAP:
+		if self._state.index_stack[-1][0] == VIEW_MAP:
 
 			# You're interacting with the map
-			if self._state.index[2] == FOCUS_MAP:
+			if self._state.index_stack[-1][2] == FOCUS_MAP:
 
 				self._controls = {	"_echo": None,
 									"coag_back": None,
@@ -299,7 +315,7 @@ class Game(object):
 									"pause": self._io_pause}
 
 			# You're interacting with the conosle
-			elif self._state.index[2] == FOCUS_CONSOLE:
+			elif self._state.index_stack[-1][2] == FOCUS_CONSOLE:
 
 				self._controls = {	"_echo": self._io_console_echo,
 									"coag_back": None,
@@ -316,12 +332,12 @@ class Game(object):
 									"pause": None}
 
 		# The controls for DC view
-		elif  self._state.index[0] == VIEW_DC:
+		elif  self._state.index_stack[-1][0] == VIEW_DC:
 
 			self._controls = coagulate_controls
 
 		# The controls for pause view
-		elif self._state.index[0] == VIEW_PAUSE:
+		elif self._state.index_stack[-1][0] == VIEW_PAUSE:
 
 			self._controls = coagulate_controls
 
@@ -363,36 +379,36 @@ class Game(object):
 	def _io_coag_back(self):
 		"""Go back into the parent of the current coagulate."""
 		
-		if not self._deref_index(self._state.index[:-1]).is_root:
+		if not self._deref_index(self._state.index_stack[-1][:-1]).is_root:
 
-			self._mod_change_index(to_value=self._state.index[:-1], set_all=True)
+			self._mod_index_edit(to_value=self._state.index_stack[-1][:-1], set_all=True)
 
 		else:
 
 			# You're just below root so return to what you were doing earlier
-			self._mod_toggle_index()
+			self._mod_index_pop()
 
 	def _io_coag_next(self):
 		"""Focus on the next thing in the coagulate."""
 
-		if len(self._deref_index(self._state.index[:-1])) > self._state.index[-1] + 1:
+		if len(self._deref_index(self._state.index_stack[-1][:-1])) > self._state.index_stack[-1][-1] + 1:
 
-			self._mod_change_index(-1, self._state.index[-1] + 1)
+			self._mod_index_edit(-1, self._state.index_stack[-1][-1] + 1)
 
 	def _io_coag_prev(self):
 		"""Focus on the previous thing in the coagulate."""
 
-		if self._state.index[-1] > 0:
+		if self._state.index_stack[-1][-1] > 0:
 
-			self._mod_change_index(-1, self._state.index[-1] - 1)
+			self._mod_index_edit(-1, self._state.index_stack[-1][-1] - 1)
 
 	def _io_coag_select(self):
 		"""Step into a Coagulate or run a Game.co_* method."""
 
 		# The referenced Differentia has nothing below it, so call method
-	 	if not len(self._deref_index(self._state.index)):
+	 	if not len(self._deref_index(self._state.index_stack[-1])):
 
-	 		method = self._deref_index(self._state.index).method
+	 		method = self._deref_index(self._state.index_stack[-1]).method
 
 	 		try: args = method[1:]
 	 		except IndexError: args = []
@@ -402,10 +418,10 @@ class Game(object):
 			return
 
 		# There's still options to choose from below you, so step in.
-		new_index = copy.copy(self._state.index)
+		new_index = copy.copy(self._state.index_stack[-1])
 		new_index.append(0)
 
-		self._mod_change_index(to_value=new_index, set_all=True)
+		self._mod_index_edit(to_value=new_index, set_all=True)
 
 	def _io_console_echo(self, char):
 		"""Deal with with echo character input."""
@@ -415,79 +431,52 @@ class Game(object):
 	def _io_console_input(self):
 		"""Switch index to input into the console."""
 
-		self._mod_change_index(2, FOCUS_CONSOLE)
+		self._mod_index_edit(2, FOCUS_CONSOLE)
 		self._mod_console_new_message()
 
 	def _io_console_submit(self):
 		"""Run the command currently at the bottom of the message log"""
 
-		self._mod_change_index(2, FOCUS_MAP)
+		self._mod_index_edit(2, FOCUS_MAP)
 		self._mod_console_run_message()
 
 	def _io_menu(self):
 		"""Go to the E-menu."""
 
-		self._mod_change_index(	to_value=[VIEW_DC, self._state.index[1], 0], 
-								set_all=True, 
-								stored_index=True)
-		self._mod_toggle_index()
+		self._mod_index_push([VIEW_DC, self._state.index_stack[-1][1], 0])
 
 	def _io_move_north(self):
 		"""Prepare to move the player character north."""
 		
-		player = self._state.index[1]
+		player = self._state.index_stack[-1][1]
 		ai_type = player.ai.split(':')[-1]
 		self._mod_set_next_turn(player, ai[ai_type].DefAI.get_move(player, DIR_NORTH))
 
 	def _io_move_west(self):
 		"""Prepare to move the player character west."""
 
-		player = self._state.index[1]
+		player = self._state.index_stack[-1][1]
 		ai_type = player.ai.split(':')[-1]
 		self._mod_set_next_turn(player, ai[ai_type].DefAI.get_move(player, DIR_WEST))
 
 	def _io_move_south(self):
 		"""Prepare to move the player character south."""
 
-		player = self._state.index[1]
+		player = self._state.index_stack[-1][1]
 		ai_type = player.ai.split(':')[-1]
 		self._mod_set_next_turn(player, ai[ai_type].DefAI.get_move(player, DIR_SOUTH))
 
 	def _io_move_east(self):
 		"""Prepare to move the player character east."""
 
-		player = self._state.index[1]
+		player = self._state.index_stack[-1][1]
 		ai_type = player.ai.split(':')[-1]
 		self._mod_set_next_turn(player, ai[ai_type].DefAI.get_move(player, DIR_EAST))
 
 	def _io_pause(self):
 		"""Pause the game."""
 
-		self._mod_change_index(to_value=[VIEW_PAUSE, 0], set_all=True, stored_index=True)
-		self._mod_toggle_index()
-
-	def _mod_change_index(self, index=0, to_value=None, set_all=False, stored_index=False):
-		"""Change self._state.index safely."""
-
-		if stored_index:
-			if set_all:
-
-				self._state.stored_index = to_value
-
-			else:
-
-				self._state.stored_index[index] = to_value
-
-		else:
-			if set_all:
-
-				self._state.index = to_value
-
-			else:
-
-				self._state.index[index] = to_value
-
-			self._build_controls()
+		self._mod_index_push([VIEW_PAUSE, 0])
 
 	def _mod_console_add_char(self, char):
 		"""Add a character to the console."""
@@ -523,6 +512,35 @@ class Game(object):
 		except Exception as error:
 
 			self._mod_console_post_message(str(error))
+
+	def _mod_index_edit(self, index=0, to_value=None, set_all=False):
+		"""Change self._state.index_stack[-1] safely."""
+
+		if set_all:
+
+			self._state.index_stack[-1] = to_value
+
+		else:
+
+			self._state.index_stack[-1][index] = to_value
+
+		self._build_controls()
+
+	def _mod_index_pop(self):
+		"""Pop an index to self._state.index_stack safely."""
+
+		index = self._state.index_stack.pop()
+
+		self._build_controls()
+
+		return index
+
+	def _mod_index_push(self, index):
+		"""Push an index into self._state.index_stack safely."""
+
+		self._state.index_stack.append(index)
+
+		self._build_controls()
 
 	def _mod_move(self, entity, to_coords):
 		"""
@@ -578,17 +596,6 @@ class Game(object):
 
 		mob.next_turn = action
 
-	def _mod_toggle_index(self):
-		"""Toggle between using index and stored_index."""
-
-		# Copy old indecies for switching
-		old_index = copy.copy(self._state.index)		# Do not make this a deepcopy
-		new_index = copy.copy(self._state.stored_index)	# Do not make this a deepcopy
-
-		# Safely swtich
-		self._mod_change_index(to_value=new_index, set_all=True)
-		self._mod_change_index(to_value=old_index, set_all=True, stored_index=True)
-
 	def _stop(self):
 
 		self._app.stop()
@@ -613,13 +620,13 @@ class Game(object):
 		"""Perform the clicked action next turn."""
 
 		# Set the action to what's in focus
-		player = self._state.index[1]
-		action = [self._deref_index(self._state.index[:-1])]
+		player = self._state.index_stack[-1][1]
+		action = [self._deref_index(self._state.index_stack[-1][:-1])]
 		action.extend(args)
 		self._mod_set_next_turn(player, action)
 
 		# Go back to the map view
-		self._mod_toggle_index()
+		self._mod_index_pop()
 
 	def co_pass(self):
 		"""Do nothing."""
@@ -634,7 +641,7 @@ class Game(object):
 	def co_resume(self):
 		"""Resume the game."""
 
-		self._mod_toggle_index()
+		self._mod_index_pop()
 
 	def eval_control_string(self, string):
 		"""
@@ -689,11 +696,10 @@ class State(object):
 	State.__str__(self)
 	State.to_dict(self)
 
-	State.index
+	State.index_stack
 	State.map
 	State.message_log
 	State.pause_coag
-	State.stored_index
 	"""
 
 	def __init__(self, saved_state=None):
@@ -710,36 +716,22 @@ class State(object):
 			self.message_log = saved_state["message_log"]
 
 			# Construct index
-			self.index = saved_state["index"]
+			self.index_stack = saved_state["index_stack"]
 
-			if saved_state["index"][0] == VIEW_MAP or saved_state["index"][0] == VIEW_DC:
+			for index in self.index_stack:
 
-				mob_loc_x = saved_state["index"][1][0][0]
-				mob_loc_y = saved_state["index"][1][0][1]
-				mob_layer = saved_state["index"][1][0][2]
-				mob_permeability = saved_state["index"][1][1]
+				if index[0] == VIEW_MAP or index[0] == VIEW_DC:
 
-				tile = self.map.grid[mob_loc_x][mob_loc_y]
-				layer = tile.layers[mob_layer]
-				mob = layer[mob_permeability]
+					mob_loc_x = index[1][0][0]
+					mob_loc_y = index[1][0][1]
+					mob_layer = index[1][0][2]
+					mob_permeability = index[1][1]
 
-				self.index[1] = mob
+					tile = self.map.grid[mob_loc_x][mob_loc_y]
+					layer = tile.layers[mob_layer]
+					mob = layer[mob_permeability]
 
-			# Construct stored_index
-			self.stored_index = saved_state["stored_index"]
-
-			if saved_state["stored_index"][0] == VIEW_MAP or saved_state["stored_index"][0] == VIEW_DC:
-
-				mob_loc_x = saved_state["stored_index"][1][0][0]
-				mob_loc_y = saved_state["stored_index"][1][0][1]
-				mob_layer = saved_state["stored_index"][1][0][2]
-				mob_permeability = saved_state["stored_index"][1][1]
-
-				tile = self.map.grid[mob_loc_x][mob_loc_y]
-				layer = tile.layers[mob_layer]
-				mob = layer[mob_permeability]
-
-				self.stored_index[1] = mob
+					index[1] = mob
 
 		else:
 
@@ -766,26 +758,20 @@ class State(object):
 		state = {}
 
 		# Fix index[1] if necessary
-		saved_index = copy.copy(self.index)
+		saved_index_stack = copy.copy(self.index_stack)
 
-		if type(self.index[1]) == Mob:
+		for saved_index in saved_index_stack:
 
-			saved_index[1] = [self.index[1].coords, int(self.index[1].quanta["default:quanta:_permeability"])]
+			if type(saved_index[1]) == Mob:
 
-		# Fix stored_index[1] if necessary
-		saved_stored_index = copy.copy(self.stored_index)
-
-		if type(self.stored_index[1]) == Mob:
-
-			saved_stored_index[1] = [self.stored_index[1].coords, int(self.stored_index[1].quanta["default:quanta:_permeability"])]
+				saved_index[1] = [saved_index[1].coords, int(saved_index[1].quanta["default:quanta:_permeability"])]
 
 		# Construct state
 		state["_type"] = "State"
-		state["index"] = saved_index
+		state["index_stack"] = saved_index_stack
 		state["map"] = self.map.to_dict()
 		state["message_log"] = self.message_log
 		state["pause_coag"] = self.pause_coag.to_dict()
-		state["stored_index"] = saved_stored_index
 
 		# Return state
 		return state
@@ -2022,12 +2008,6 @@ class Quanta(Characteristic):
 class Action(Differentia):
 	"""
 	A single action granted by a Figment
-thod = self._deref_index(self._state.index).method
-
-	 		try: args = method[1:]
-	 		except IndexError: args = []
-			
-			method[0](self, *args)
 
 	Action.__getattr__(self, attr)
 	Action.__init__(self, name="", id_="", tree=(), method=[Game.co_do_action], is_root=False, saved_state=None)

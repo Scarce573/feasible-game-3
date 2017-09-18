@@ -100,7 +100,7 @@ class ConsoleRenderer(Renderer):
 	def _view_coag(self, root_level=0):
 		
 		# Load information
-		game_index = self._app._game._state.index
+		game_index = self._app._game._state.index_stack[-1]
 		# *** DEBUG ***
 		vis_depth = 2
 		vis_number = 15
@@ -214,7 +214,7 @@ class ConsoleRenderer(Renderer):
 		# Call super.loop, which is unnecessary for now but good form
 		super(ConsoleRenderer, self).loop()
 
-		if self._app._game._state.index[0] == VIEW_MAP:
+		if self._app._game._state.index_stack[-1][0] == VIEW_MAP:
 
 			self._view_map()
 
@@ -223,7 +223,7 @@ class ConsoleRenderer(Renderer):
 				self._change_flag = VIEW_MAP
 				self._app._screen.redrawwin()
 
-		elif self._app._game._state.index[0] == VIEW_DC:
+		elif self._app._game._state.index_stack[-1][0] == VIEW_DC:
 
 			self._view_coag(root_level=1)
 
@@ -232,7 +232,7 @@ class ConsoleRenderer(Renderer):
 				self._change_flag = VIEW_DC
 				self._app._screen.redrawwin()
 
-		elif self._app._game._state.index[0] == VIEW_PAUSE:
+		elif self._app._game._state.index_stack[-1][0] == VIEW_PAUSE:
 
 			self._view_coag(root_level=0)
 
