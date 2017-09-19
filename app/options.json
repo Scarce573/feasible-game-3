@@ -2,17 +2,17 @@
 "controls":	
 	{
 		"106": ["coag_select"],
-		"107": ["coag_back"],
+		"107": ["coag_back", "pmt_back"],
 
 		"10": ["console_input", "console_submit"],
 		"47": ["console_input"],
 
 		"101": ["menu"],
 
-		"119": ["move_north", "coag_prev"],
-		"97": ["move_west"], 
-		"115": ["move_south", "coag_next"], 
-		"100": ["move_east"],
+		"119": ["move_north", "coag_prev", "pmt_dir_north"],
+		"97": ["move_west", "pmt_dir_west"], 
+		"115": ["move_south", "coag_next", "pmt_dir_south"], 
+		"100": ["move_east", "pmt_dir_east"],
 
 		"112": ["pause"]
 	}

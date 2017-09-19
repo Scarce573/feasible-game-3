@@ -15,6 +15,9 @@ VIEW_MAP = 0
 VIEW_DC = 1
 VIEW_PAUSE = 2
 
+VIEW_PROMPT_NULL = 10
+VIEW_PROMPT_DIR = 11
+
 # Classes
 class ConsoleRenderer(Renderer):
 	"""
@@ -239,6 +242,15 @@ class ConsoleRenderer(Renderer):
 			if self._change_flag != VIEW_PAUSE:
 
 				self._change_flag = VIEW_PAUSE
+				self._app._screen.redrawwin()
+
+		elif self._app._game._state.index_stack[-1][0] == VIEW_PROMPT_DIR:
+
+			self._view_map()
+
+			if self._change_flag != VIEW_PROMPT_DIR:
+
+				self._change_flag = VIEW_PROMPT_DIR
 				self._app._screen.redrawwin()
 		
 		# Update

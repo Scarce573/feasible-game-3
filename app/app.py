@@ -46,6 +46,9 @@ VIEW_MAP = 0
 VIEW_DC = 1
 VIEW_PAUSE = 2
 
+VIEW_PROMPT_NULL = 10
+VIEW_PROMPT_DIR = 11
+
 # Classes
 class App(object):
 	"""
@@ -188,6 +191,11 @@ class Game(object):
 	Game._io_move_south(self)
 	Game._io_move_east(self)
 	Game._io_pause(self)
+	Game._io_pmt_back(self)
+	Game._io_pmt_dir_north(self)
+	Game._io_pmt_dir_west(self)
+	Game._io_pmt_dir_south(self)
+	Game._io_pmt_dir_east(self)
 	Game._mod_console_add_char(self, char)
 	Game._mod_console_new_message(self)
 	Game._mod_console_post_message(self, message)
@@ -196,7 +204,11 @@ class Game(object):
 	Game._mod_index_pop(self)
 	Game._mod_index_push(self, index)
 	Game._mod_move(self, mob, to_coords)
+	Game._mod_prompt_input(self, input)
 	Game._mod_set_next_turn(self, mob, action)
+	Game._pend_co_do_action(self, *args)
+	Game._prompt_start(self, pend_func, prompts, allow_exit=False)
+	Game._prompt_back(self)
 	Game._stop(self)
 	Game._turn(self)
 	Game.co_do_action(self)
@@ -210,21 +222,6 @@ class Game(object):
 	Game._app
 	Game._controls
 	Game._state
-
-	WORKING:
-	Game._io_pmt_back(self)
-	Game._io_pmt_dir_north(self)
-	Game._io_pmt_dir_west(self)
-	Game._io_pmt_dir_south(self)
-	Game._io_pmt_dir_east(self)
-	Game._mod_prompt_input(self, input)
-	Game._pend_co_do_action(self, *args)
-	Game._prompt_start(self, pend_func, prompts, allow_exit=False)
-	Game._prompt_back(self)
-	Game.pmt_direction(self, promptspace)
-	- The Game._io_pmt_* subspace is for i/o functions spectific to prompts
-	- The Game._pend_* namespace is for functions which are called when a prompt finishes
-	- The Game.pmt_* namespace is for functions that set the index up for a prompt
 	"""
 
 	def __init__(self, app, options):
@@ -279,7 +276,66 @@ class Game(object):
 		This is the only function which can edit self._controls.
 		"""
 
-		# The coagulate controls
+		# The controls
+		# *** DEBUG ***
+		empty_controls = {"_echo": None,
+							"coag_back": None,
+							"coag_next": None,
+							"coag_prev": None,
+							"coag_select": None,
+							"console_submit": None,
+							"console_input": None,
+							"menu": None,
+							"move_north": None,
+							"move_west": None,
+							"move_south": None,
+							"move_east": None,
+							"pause": None,
+							"pmt_back": None,
+							"pmt_dir_north": None,
+							"pmt_dir_west": None,
+							"pmt_dir_south": None,
+							"pmt_dir_east": None}
+		# *** DEBUG ***
+
+		map_controls = {"_echo": None,
+							"coag_back": None,
+							"coag_next": None,
+							"coag_prev": None,
+							"coag_select": None,
+							"console_submit": None,
+							"console_input": self._io_console_input,
+							"menu": self._io_menu,
+							"move_north": self._io_move_north,
+							"move_west": self._io_move_west,
+							"move_south": self._io_move_south,
+							"move_east": self._io_move_east,
+							"pause": self._io_pause,
+							"pmt_back": None,
+							"pmt_dir_north": None,
+							"pmt_dir_west": None,
+							"pmt_dir_south": None,
+							"pmt_dir_east": None}
+
+		console_controls = {"_echo": self._io_console_echo,
+								"coag_back": None,
+								"coag_next": None,
+								"coag_prev": None,
+								"coag_select": None,
+								"console_submit": self._io_console_submit,
+								"console_input": None,
+								"menu": None,
+								"move_north": None,
+								"move_west": None,
+								"move_south": None,
+								"move_east": None,
+								"pause": None,
+								"pmt_back": None,
+								"pmt_dir_north": None,
+								"pmt_dir_west": None,
+								"pmt_dir_south": None,
+								"pmt_dir_east": None}
+
 		coagulate_controls = {	"_echo": None,
 								"coag_back": self._io_coag_back,
 								"coag_next": self._io_coag_next,
@@ -292,7 +348,31 @@ class Game(object):
 								"move_west": None,
 								"move_south": None,
 								"move_east": None,
-								"pause": None}
+								"pause": None,
+								"pmt_back": None,
+								"pmt_dir_north": None,
+								"pmt_dir_west": None,
+								"pmt_dir_south": None,
+								"pmt_dir_east": None}
+
+		pmt_direction_controls = {"_echo": None,
+							"coag_back": None,
+							"coag_next": None,
+							"coag_prev": None,
+							"coag_select": None,
+							"console_submit": None,
+							"console_input": None,
+							"menu": None,
+							"move_north": None,
+							"move_west": None,
+							"move_south": None,
+							"move_east": None,
+							"pause": self._io_pause,
+							"pmt_back": self._io_pmt_back,
+							"pmt_dir_north": self._io_pmt_dir_north,
+							"pmt_dir_west": self._io_pmt_dir_west,
+							"pmt_dir_south": self._io_pmt_dir_south,
+							"pmt_dir_east": self._io_pmt_dir_east}
 
 		# The controls for the map view
 		if self._state.index_stack[-1][0] == VIEW_MAP:
@@ -300,36 +380,12 @@ class Game(object):
 			# You're interacting with the map
 			if self._state.index_stack[-1][2] == FOCUS_MAP:
 
-				self._controls = {	"_echo": None,
-									"coag_back": None,
-									"coag_next": None,
-									"coag_prev": None,
-									"coag_select": None,
-									"console_submit": None,
-									"console_input": self._io_console_input,
-									"menu": self._io_menu,
-									"move_north": self._io_move_north,
-									"move_west": self._io_move_west,
-									"move_south": self._io_move_south,
-									"move_east": self._io_move_east,
-									"pause": self._io_pause}
+				self._controls = map_controls
 
 			# You're interacting with the conosle
 			elif self._state.index_stack[-1][2] == FOCUS_CONSOLE:
 
-				self._controls = {	"_echo": self._io_console_echo,
-									"coag_back": None,
-									"coag_next": None,
-									"coag_prev": None,
-									"coag_select": None,
-									"console_submit": self._io_console_submit,
-									"console_input": None,
-									"menu": None,
-									"move_north": None,
-									"move_west": None,
-									"move_south": None,
-									"move_east": None,
-									"pause": None}
+				self._controls = console_controls
 
 		# The controls for DC view
 		elif  self._state.index_stack[-1][0] == VIEW_DC:
@@ -340,6 +396,11 @@ class Game(object):
 		elif self._state.index_stack[-1][0] == VIEW_PAUSE:
 
 			self._controls = coagulate_controls
+
+		# The controls for direction prompt view
+		elif self._state.index_stack[-1][0] == VIEW_PROMPT_DIR:
+
+			self._controls = pmt_direction_controls
 
 	def _deref_index(self, index):
 		"""
@@ -478,6 +539,31 @@ class Game(object):
 
 		self._mod_index_push([VIEW_PAUSE, 0])
 
+	def _io_pmt_back(self):
+		"""Go back a prompt"""
+
+		self._prompt_back()
+
+	def _io_pmt_dir_north(self):
+		"""Give the direction north to the prompting."""
+
+		self._mod_prompt_input(DIR_NORTH)
+
+	def _io_pmt_dir_west(self):
+		"""Give the direction west to the prompting."""
+
+		self._mod_prompt_input(DIR_WEST)
+
+	def _io_pmt_dir_south(self):
+		"""Give the direction south to the prompting."""
+
+		self._mod_prompt_input(DIR_SOUTH)
+
+	def _io_pmt_dir_east(self):
+		"""Give the direction east to the prompting."""
+
+		self._mod_prompt_input(DIR_EAST)
+
 	def _mod_console_add_char(self, char):
 		"""Add a character to the console."""
 
@@ -591,10 +677,110 @@ class Game(object):
 		# Fix entity.coords
 		entity.coords = to_coords
 
+	def _mod_prompt_input(self, info):
+		"""Input something into the prompt space's args and go to the next prompt."""
+
+		# Get promptspace
+		promptspace = self._state.index_stack[-1][1]
+
+		# Add the input to the args
+		promptspace["args"].append(info)
+
+		try: 
+
+			next_prompt = promptspace["prompts"][len(promptspace["args"])]
+
+			# Start the next callable prompt
+			if callable(next_prompt):
+
+				next_prompt(self, copy.copy(promptspace))
+
+			else:
+
+				self._mod_prompt_input(next_prompt)
+
+		except IndexError: 
+
+			# There's nothing to prompt, so just execute the prompt ending
+			self._mod_index_pop()
+			promptspace["pend"](*promptspace["args"])
+
 	def _mod_set_next_turn(self, mob, action):
 		"""Set the next turn of the mob."""
 
 		mob.next_turn = action
+	
+	def _pend_co_do_action(self, *args):
+		"""Finish Game.co_do_action after all information has been prompted."""
+
+		# Set the action to what's in focus
+		player = self._state.index_stack[-1][1]
+		action = [self._deref_index(self._state.index_stack[-1][:-1])]
+		action.extend(args)
+		self._mod_set_next_turn(player, action)
+
+		# Go back to the map view
+		self._mod_index_pop()
+
+	def _prompt_start(self, pend_func, prompts, allow_exit=False):
+		"""Begin prompting and make the prompt space."""
+
+		# Make the promptspace
+		promptspace = {	"pend": pend_func,
+						"args": [],
+						"prompts": prompts,
+						"allow_exit": allow_exit}
+
+		# Store it in the index so that the length is constant
+		self._mod_index_push([VIEW_PROMPT_NULL, promptspace])
+
+		# Check if there's anything to prompt
+		try: 
+
+			next_prompt = promptspace["prompts"][0]
+
+			# Start the next callable prompt
+			if callable(next_prompt):
+
+				next_prompt(self, copy.copy(promptspace))
+
+			else:
+
+				self._mod_prompt_input(next_prompt)
+
+		except IndexError: 
+
+			# There's nothing to prompt, so just execute the prompt ending
+			self._mod_index_pop()
+			promptspace["pend"](*promptspace["args"])
+
+	def _prompt_back(self):
+		"""Go back to the previous prompt."""
+
+		# Get promptspace
+		promptspace = self._state.index_stack[-1][1]
+
+		# Check if there's anything to go back to 
+		try: 
+
+			promptspace["args"].pop()
+			prev_prompt = promptspace["prompts"][len(promptspace["args"])]
+
+			# Start the previous callable prompt
+			if callable(prev_prompt):
+
+				prev_prompt(self, copy.copy(promptspace))
+
+			else:
+
+				self._prompt_back()
+
+		except IndexError: 
+
+			# There's nothing to left to go back to
+			if promptspace["allow_exit"]:
+
+				self._mod_index_pop()
 
 	def _stop(self):
 
@@ -619,14 +805,7 @@ class Game(object):
 	def co_do_action(self, *args):
 		"""Perform the clicked action next turn."""
 
-		# Set the action to what's in focus
-		player = self._state.index_stack[-1][1]
-		action = [self._deref_index(self._state.index_stack[-1][:-1])]
-		action.extend(args)
-		self._mod_set_next_turn(player, action)
-
-		# Go back to the map view
-		self._mod_index_pop()
+		self._prompt_start(self._pend_co_do_action, list(args), allow_exit=True)
 
 	def co_pass(self):
 		"""Do nothing."""
@@ -686,6 +865,12 @@ class Game(object):
 		if will_do_turn:
 
 			self._turn()
+
+	def pmt_direction(self, promptspace):
+		"""Prompt for directional input when the map is visible."""
+
+		self._mod_index_pop()
+		self._mod_index_push([VIEW_PROMPT_DIR, promptspace, self._state.index_stack[0][1]])
 
 class State(object):
 	"""
@@ -2049,15 +2234,6 @@ class Action(Differentia):
 			self._tree.append(Coagulate(name="Quanta",
 										tree=quanta,
 										is_root=False))
-
-			# *** DEBUG ***
-			for arg in meth_args:
-
-				
-				method = [Game.co_do_action]
-				method.extend(arg)
-				self._tree.append(Coagulate(name="Do", method=method))
-			# *** DEBUG ***
 
 	def to_dict(self):
 		"""Create a JSON-serializable dict representation of the Action."""
