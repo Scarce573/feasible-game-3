@@ -55,11 +55,11 @@ class ConsoleRenderer(Renderer):
 	def _make_map(self, game_map):
 
 		# Make a pad for map
-		map_pad = curses.newpad(game_map._size[1], game_map._size[0])
+		map_pad = curses.newpad(game_map.size[1], game_map.size[0])
 		
 		# Construct the map pad
-		for y_val in range(0, game_map._size[1]):
-		    for x_val in range(0, game_map._size[0]):
+		for y_val in range(0, game_map.size[1]):
+		    for x_val in range(0, game_map.size[0]):
 
 			tile_to_render = game_map.grid[x_val][y_val]
 
@@ -209,8 +209,8 @@ class ConsoleRenderer(Renderer):
 		message_log_pad = self._make_message_log(game_message_log)
 
 		# Print pads to scren
-		map_pad.noutrefresh(0, 0, 0, 0, game_map._size[1], game_map._size[0])
-		message_log_pad.noutrefresh(0, 0, game_map._size[1], 0, game_map._size[1] + 3, game_map._size[0])
+		map_pad.noutrefresh(0, 0, 0, 0, game_map.size[1], game_map.size[0])
+		message_log_pad.noutrefresh(0, 0, game_map.size[1], 0, game_map.size[1] + 3, game_map.size[0])
 
 	def loop(self):
 

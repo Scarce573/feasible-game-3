@@ -236,7 +236,7 @@ class Game(object):
 								"debug/state.json")
 		with open(path, 'r') as state_file:
 
-			self._state = load_from_dict(json_loads_str(state_file.read()))
+			self._state = load_if_dict(json_loads_str(state_file.read()))
 
 		#path = os.path.join(	os.path.dirname(__file__), 
 		#						"debug/state2.json")
@@ -876,9 +876,9 @@ class State(object):
 	"""
 	The class which contains all the in-game information necessary to take a snapshot
 
-	State.__init__(self, saved_state=None)
+	State.__init__(self, map_, message_log, index_stack)
 	State.__repr__(self)
-	State.__str__(self)
+	State.__str__(self)f
 	State.to_dict(self)
 
 	State.index_stack
@@ -887,40 +887,31 @@ class State(object):
 	State.pause_coag
 	"""
 
-	def __init__(self, saved_state=None):
+	def __init__(self, map_, index_stack, message_log=[]):
 		"""
-		Initialize the State, perhaps from a saved state.
-
-		Member variables have free reign to edit saved_state.
+		Initialize the State.
 		"""
 
-		if saved_state:
+		self.map = load_if_dict(map_)
+		self.message_log = message_log
 
-			# Loading from a saved_state dict
-			self.map = load_from_dict(saved_state["map"])
-			self.message_log = saved_state["message_log"]
+		# Construct index
+		self.index_stack = index_stack
 
-			# Construct index
-			self.index_stack = saved_state["index_stack"]
+		for index in self.index_stack:
 
-			for index in self.index_stack:
+			if index[0] == VIEW_MAP or index[0] == VIEW_DC:
 
-				if index[0] == VIEW_MAP or index[0] == VIEW_DC:
+				mob_loc_x = index[1][0][0]
+				mob_loc_y = index[1][0][1]
+				mob_layer = index[1][0][2]
+				mob_permeability = index[1][1]
 
-					mob_loc_x = index[1][0][0]
-					mob_loc_y = index[1][0][1]
-					mob_layer = index[1][0][2]
-					mob_permeability = index[1][1]
+				tile = self.map.grid[mob_loc_x][mob_loc_y]
+				layer = tile.layers[mob_layer]
+				mob = layer[mob_permeability]
 
-					tile = self.map.grid[mob_loc_x][mob_loc_y]
-					layer = tile.layers[mob_layer]
-					mob = layer[mob_permeability]
-
-					index[1] = mob
-
-		else:
-
-			pass
+				index[1] = mob
 
 		self.pause_coag = Coagulate(name="Paused",
 									tree=[	Coagulate(name="Quit", method=[Game.co_quit]),
@@ -965,43 +956,46 @@ class Map(object):
 	"""
 	The class which contains a grid of tiles
 
-	Map.__init__(self, saved_state=None)
+	Map.__init__(self, grid=[])
 	Map.__repr__(self)
 	Map.__str__(self)
 	Map.get_mobs(self)
 	Map.to_dict(self)
 	Map.yield_mobs(self)
 
-	Map._size
 	Map.grid
+	Map.size
 	"""
 
-	def __init__(self, saved_state=None):
-		"""Initialize the Map, perhaps from a saved state."""
+	def __getattr__(self, attr):
+		"""Get an attribute, but do a special behavior with size."""
 
-		if saved_state:
+		if attr == "size":
+			if len(self.grid):
 
-			# Loading from a saved_state dict
-			self._size = tuple(saved_state["size"])
-
-			# Construct grid
-			self.grid = []
-
-			for x_val in range(len(saved_state["grid"])):
-
-				saved_col = saved_state["grid"][x_val]
-				col = []
-
-				for y_val in range(len(saved_col)):
-
-					saved_tile = saved_state["grid"][x_val][y_val]
-					col.append(load_from_dict(saved_tile, [x_val, y_val]))
-
-				self.grid.append(col)
+				return (len(self.grid), len(self.grid[0]))
 
 		else:
 
-			pass
+			super(Action, self).__getattr__(attr)
+
+	def __init__(self, grid=[]):
+		"""Initialize the Map."""
+
+		# Construct grid
+		self.grid = []
+
+		for x_val in range(len(grid)):
+
+			saved_col = grid[x_val]
+			col = []
+
+			for y_val in range(len(saved_col)):
+
+				saved_tile = grid[x_val][y_val]
+				col.append(load_if_dict(saved_tile, coords=[x_val, y_val]))
+
+			self.grid.append(col)
 
 	def __repr__(self):
 		"""Return a syntactically correct string representation of the Map based off of to_dict."""
@@ -1088,7 +1082,7 @@ class Tile(object):
 	"""
 	A tile on the map, potentially containing many entities
 
-	Tile.__init__(self, coords=(-1, -1), saved_state=None)
+	Tile.__init__(self, coords=(-1, -1), layers=[])
 	Tile.__repr__(self)
 	Tile.__str__(self)
 	Tile.get_mobs(self)
@@ -1098,33 +1092,24 @@ class Tile(object):
 	Tile.layers
 	"""
 
-	def __init__(self, coords=(-1, -1), saved_state=None):
-		"""Initialize the Tile, perhaps from a saved state."""
+	def __init__(self, coords=(-1, -1), layers=[]):
+		"""Initialize the Tile."""
 
-		if saved_state:
+		# Construct layers
+		self.layers = []
 
-			# Loading from a saved_state dict
-			# Construct layers
-			self.layers = []
+		for saved_layer_dict in layers:
 
-			saved_layers_list = saved_state["layers"]
+			layer = {}
 
-			for saved_layer_dict in saved_layers_list:
+			for key in saved_layer_dict:
 
-				layer = {}
+				entity_coords = copy.copy(coords)
+				entity_coords.append(int(key))
 
-				for key in saved_layer_dict:
+				layer[int(key)] = load_if_dict(saved_layer_dict[key], coords=entity_coords)
 
-					entity_coords = copy.copy(coords)
-					entity_coords.append(int(key))
-
-					layer[int(key)] = load_from_dict(saved_layer_dict[key], entity_coords)
-
-				self.layers.append(layer)
-
-		else:
-
-			pass
+			self.layers.append(layer)
 
 		self.coords = coords
 
@@ -1187,7 +1172,7 @@ class Entity(object):
 	Higher permeability means it's more similar to a vaccuum.
 
 	Entity.__getattr__(self, attr)
-	Entity.__init__(self, coords=(-1, -1, -1), saved_state=None)
+	Entity.__init__(self, inventory, knowledge, status, coords=(-1, -1, -1), id_="")
 	Entity.__repr__(self)
 	Entity.__str__(self)
 	Entity._find_qualita(self)
@@ -1233,22 +1218,14 @@ class Entity(object):
 
 			return super(Entity, self).__getattr__(attr)
 
-	def __init__(self, coords=(-1, -1, -1), saved_state=None):
-		"""Initialize the Entity, perhaps from a saved state."""
-
-		if saved_state:
-
-			# Loading from a saved_state dict
-			self.id = saved_state["id"]
-			self.inventory = load_from_dict(saved_state["inventory"])
-			self.knowledge = load_from_dict(saved_state["knowledge"])
-			self.status = load_from_dict(saved_state["status"])
-
-		else:
-
-			pass
+	def __init__(self, inventory, knowledge, status, coords=(-1, -1, -1), id_=""):
+		"""Initialize the Entity."""
 
 		self.coords = coords
+		self.id = id_
+		self.inventory = load_if_dict(inventory)
+		self.knowledge = load_if_dict(knowledge)
+		self.status = load_if_dict(status)
 
 	def __repr__(self):
 		"""Return a syntactically correct string representation of the Entity based off of to_dict."""
@@ -1322,7 +1299,7 @@ class Entity(object):
 
 		# Construct state
 		state["_type"] = "Entity"
-		state["id"] = self.id
+		state["id_"] = self.id
 		state["inventory"] = self.inventory.to_dict()
 		state["knowledge"] = self.knowledge.to_dict()
 		state["status"] = self.status.to_dict()
@@ -1334,16 +1311,16 @@ class NonMob(Entity):
 	"""
 	An entity wihout an AI
 
-	NonMob.__init__(self, coords=(-1, -1, -1), saved_state=None)
+	NonMob.__init__(self, **argsd)
 	NonMob.to_dict(self)
 
 	Also includes some member variables from Entity
 	"""
 
-	def __init__(self, coords=(-1, -1, -1), saved_state=None):
-		"""Initialize the NonMob, perhaps from a saved state."""
+	def __init__(self, **argsd):
+		"""Initialize the NonMob."""
 
-		super(NonMob, self).__init__(coords, saved_state)
+		super(NonMob, self).__init__(**argsd)
 
 	def to_dict(self):
 		"""Create a JSON-serializable dict representation of the NonMob."""
@@ -1361,7 +1338,7 @@ class Mob(Entity):
 	An entity with an AI
 
 	Mob.__getattr__(self, attr)
-	Mob.__init__(self, coords=(-1, -1, -1), saved_state=None)
+	Mob.__init__(self, ai="", next_turn=None, **argsd)
 	Mob._find_actions(self)
 	Mob.to_dict(self)
 
@@ -1393,20 +1370,13 @@ class Mob(Entity):
 
 			return super(Mob, self).__getattr__(attr)
 
-	def __init__(self, coords=(-1, -1, -1), saved_state=None):
-		"""Initialize the Mob, perhaps from a saved state."""
+	def __init__(self, ai="", next_turn=None, **argsd):
+		"""Initialize the Mob."""
 
-		super(Mob, self).__init__(coords, saved_state)
+		super(Mob, self).__init__(**argsd)
 
-		if saved_state:
-
-			# Loading from a saved_state dict
-			self.ai = saved_state["ai"]
-			self.next_turn = saved_state["next_turn"]
-
-		else:
-
-			pass
+		self.ai = ai
+		self.next_turn = next_turn
 
 	def _find_actions(self):
 		"""Find and return the Mob's actions."""
@@ -1454,7 +1424,7 @@ class Coagulate(object):
 
 	Coagulate.__contains__(self, item)
 	Coagulate.__getitem__(self, index)
-	Coagulate.__init__(self, name="", tree=(), saved_state=None)
+	Coagulate.__init__(self, name="", tree=[], method=[Game.co_pass], is_root=False)
 	Coagulate.__len__(self)
 	Coagulate.__repr__(self)
 	Coagulate.__str__(self)
@@ -1506,45 +1476,32 @@ class Coagulate(object):
 
 			raise TypeError("Coagulate indecies/keys must be integers/strings, not " + str(type(index))) 
 
-	def __init__(self, name="", tree=(), method=[Game.co_pass], is_root=False, saved_state=None):
-		"""
-		Initialize the Coagulate, perhaps from a saved state.
+	def __init__(self, name="", tree=[], method=[Game.co_pass], is_root=False):
+		"""Initialize the Coagulate."""
 
-		It does not use load_from_dict() on anything not in saved_state
-		"""
+		self.is_root = is_root
+		self.name = name
 
-		if saved_state:
+		# Construct tree
+		self._tree = []
 
-			# Loading from a saved_state dict
-			self.is_root = saved_state["is_root"]
-			self.name = saved_state["name"]
+		for coag in tree:
 
-			# Construct tree
-			self._tree = []
+			self._tree.append(load_if_dict(coag))
 
-			for coag in saved_state["tree"]:
+		# Construct method
+		self.method = []
 
-				self._tree.append(load_from_dict(coag))
+		for arg in method:
+			if type(arg) == str:
+				if arg.find('$') != -1:
 
-			# Construct method
-			self.method = []
+					self.method.append(Game.__dict__[arg[arg.index('$') + 1:]])
 
-			for method in saved_state["method"]:
-				if type(method) == str:
-					if method.find('$') != -1:
+			else:
 
-						self.method.append(Game.__dict__[method[method.index('$') + 1:]])
-
-				else:
-
-					self.method.append(method)
-
-		else:
-
-			self._tree = tree
-			self.is_root = is_root
-			self.method = method
-			self.name = name
+				self.method.append(arg)
+			
 
 	def __len__(self):
 		"""Get the length of the Coagulate."""
@@ -1608,7 +1565,7 @@ class Differentia(Coagulate):
 	"""
 	Any game element goes inside of a coagulate.
 	
-	__init__(self, name="", id_="", tree=(), method=[Game.co_pass], is_root=False, saved_state=None)
+	__init__(self, id_="", **argsd)
 	Differentia.to_dict(self)
 
 	Differentia.id
@@ -1616,19 +1573,17 @@ class Differentia(Coagulate):
 	Also includes some member variables from Coagulate.
 	"""
 
-	def __init__(self, name="", id_="", tree=(), method=[Game.co_pass], is_root=False, saved_state=None):
-		"""Initialize the Differentia, perhaps from a saved state."""
+	def __init__(self, id_="", **argsd):
+		"""Initialize the Differentia."""
 
-		super(Differentia, self).__init__(name, tree, method, is_root, saved_state)
+		# Issue: This is deleting the inate quanta/lita of Figments
 
-		if saved_state:
+		try: del argsd["method"]
+		except KeyError: pass
 
-			# Loading from a saved_state dict
-			self.id = saved_state["id"]	
+		super(Differentia, self).__init__(method=[Game.co_pass], **argsd)
 
-		else:
-
-			self.id = id_
+		self.id = id_
 
 	def to_dict(self):
 		"""Create a JSON-serializable dict representation of the Differentia."""
@@ -1637,18 +1592,18 @@ class Differentia(Coagulate):
 
 		# Construct state
 		state["_type"] = "Differentia"
-		state["id"] = self.id
+		state["id_"] = self.id
 
 		# Return state
 		return state
 
 class Figment(Differentia):
-	"""m
+	"""
 	A figment of the game, such as an item, status, or concept.
 
 	Figment.__getattr__(self, attr)
-	Figment.__init__(	self, name="", id_="", actions=[], qualita_inate=[], qualita_inherited=[], 
-						quanta_inate=[], quanta_inherited=[], is_root=False, saved_state=None)
+	Figment.__init__(	self, actions=[], qualita_inate=[], qualita_inherited=[], 
+						quanta_inate=[], quanta_inherited=[], **argsd)
 	Figment.to_dict(self)
 
 	Figment.actions
@@ -1673,56 +1628,52 @@ class Figment(Differentia):
 
 			super(Figment, self).__getattr__(attr)
 
-	def __init__(	self, name="", id_="", actions=[], qualita_inate=[], qualita_inherited=[], 
-					quanta_inate=[], quanta_inherited=[], is_root=False, saved_state=None):
-		"""Initialze the Figment, perhaps from a saved state."""
+	def __init__(	self, actions=[], qualita_inate=None, qualita_inherited=[], 
+					quanta_inate=None, quanta_inherited=[], **argsd):
+		"""
+		Initialze the Figment.
 
-		super(Figment, self).__init__(name, id_, [], [Game.co_pass], is_root, saved_state)
+		Both quanta_inate and qualita_inate need to be defined for it do override tree.
+		"""
 
-		if saved_state:
-
-			# Loading from a saved_state dict
-			# Inate quanta and qualita should have already been loaded from _tree
+		super(Figment, self).__init__(**argsd)
 			
-			# Construct inherit lists
-			self.actions = []
-			self.qualita_inherited = []
-			self.quanta_inherited = []
+		# Construct inherit lists
+		self.actions = []
+		self.qualita_inherited = []
+		self.quanta_inherited = []
 
-			for saved_action in saved_state["actions"]:
+		for saved_action in actions:
 
-				action = []
-				action.append(load_from_dict(saved_action[0]))
-				action.extend(saved_action[1:])
-				self.actions.append(action)
+			action = []
+			action.append(load_if_dict(saved_action[0]))
+			action.extend(saved_action[1:])
+			self.actions.append(action)
 
-			for saved_qualita in saved_state["qualita_inherited"]:
+		for saved_qualita in qualita_inherited:
 
-				qualita = []
-				qualita.append(load_from_dict(saved_qualita[0]))
-				qualita.extend(saved_qualita[1:])
-				self.qualita_inherited.append(qualita)
+			qualita = []
+			qualita.append(load_if_dict(saved_qualita[0]))
+			qualita.extend(saved_qualita[1:])
+			self.qualita_inherited.append(qualita)
 
-			for saved_quanta in saved_state["quanta_inherited"]:
+		for saved_quanta in quanta_inherited:
 
-				quanta = []
-				quanta.append(load_from_dict(saved_quanta[0]))
-				quanta.extend(saved_quanta[1:])
-				self.quanta_inherited.append(quanta)
+			quanta = []
+			quanta.append(load_if_dict(saved_quanta[0]))
+			quanta.extend(saved_quanta[1:])
+			self.quanta_inherited.append(quanta)
+		
+		# Override the data in tree
+		if qualita_inate != None and quanta_inate != None:
 
-		else:
-
-			self.actions = actions
-
-			self._tree.append(Coagulate(name="Qualita",
+			self._tree[0] = (Coagulate(	name="Qualita",
 										tree=qualita_inate,
 										is_root=False))
-			self.qualita_inherited = qualita_inherited
 
-			self._tree.append(Coagulate(name="Quanta",
+			self._tree[1] =	(Coagulate(	name="Quanta",
 										tree=quanta_inate,
 										is_root=False))
-			self.quanta_inherited = quanta_inherited
 
 	def to_dict(self):
 		"""Create a JSON-serializable dict representation of the Figment."""
@@ -1768,17 +1719,14 @@ class Item(Figment):
 	"""
 	An item, something which can be picked up and dropped
 
-	Item.__init__(	self, name="", id_="", actions=[], qualita_inate=[], qualita_inherited=[], 
-					quanta_inate=[], quanta_inherited=[], is_root=False, saved_state=None)
+	Item.__init__(self, **argsd)
 	Item.to_dict(self)
 	"""
 
-	def __init__(	self, name="", id_="", actions=[], qualita_inate=[], qualita_inherited=[], 
-					quanta_inate=[], quanta_inherited=[], is_root=False, saved_state=None):
-		"""Initialze the Item, perhaps from a saved state."""
+	def __init__(self, **argsd):
+		"""Initialze the Item."""
 
-		super(Item, self).__init__(	name, id_, actions, qualita_inate, qualita_inherited, quanta_inate, 
-									quanta_inherited, is_root, saved_state)
+		super(Item, self).__init__(**argsd)
 
 	def to_dict(self):
 		"""Create a JSON-serializable dict representation of the Item."""
@@ -1795,17 +1743,15 @@ class Status(Figment):
 	"""
 	A physical descriptor of an entity
 
-	Status.__init__(	self, name="", id_="", actions=[], qualita_inate=[], qualita_inherited=[], 
-						quanta_inate=[], quanta_inherited=[], is_root=False, saved_state=None)
+	Status.__init__(self, **argsd)
 	Status.to_dict(self)
 	"""
 
-	def __init__(	self, name="", id_="", actions=[], qualita_inate=[], qualita_inherited=[], 
-					quanta_inate=[], quanta_inherited=[], is_root=False, saved_state=None):
-		"""Initialze the Status, perhaps from a saved state."""
+	def __init__(self, **argsd):
+		"""Initialze the Status."""
 
-		super(Status, self).__init__(	name, id_, actions, qualita_inate, qualita_inherited, quanta_inate, 
-										quanta_inherited, is_root, saved_state)
+		super(Status, self).__init__(**argsd)
+
 	def to_dict(self):
 		"""Create a JSON-serializable dict representation of the Status."""
 
@@ -1821,17 +1767,14 @@ class Concept(Figment):
 	"""
 	A non-physical descriptor of an entity.
 
-	Concept.__init__(	self, name="", id_="", actions=[], qualita_inate=[], qualita_inherited=[], 
-						quanta_inate=[], quanta_inherited=[], is_root=False, saved_state=None)
+	Concept.__init__(self, **argsd)
 	Concept.to_dict(self)
 	"""
 
-	def __init__(	self, name="", id_="", actions=[], qualita_inate=[], qualita_inherited=[], 
-					quanta_inate=[], quanta_inherited=[], is_root=False, saved_state=None):
-		"""Initialze the Concept, perhaps from a saved state."""
+	def __init__(self, **argsd):
+		"""Initialze the Concept."""
 
-		super(Concept, self).__init__(	name, id_, actions, qualita_inate, qualita_inherited, quanta_inate, 
-										quanta_inherited, is_root, saved_state)
+		super(Concept, self).__init__(**argsd)
 
 	def to_dict(self):
 		"""Create a JSON-serializable dict representation of the Concept."""
@@ -1848,25 +1791,21 @@ class Characteristic(Differentia):
 	"""
 	A single characteristic granted by a Figment
 
-	Characteristic.__init__(self, name="", id_="", value=None, is_root=False, saved_state=None)
+	Characteristic.__init__(self, value=None, **argsd)
 	Characteristic.to_dict(self)
 
 	Characteristic._value
 	"""
 
-	def __init__(self, name="", id_="", value=None, is_root=False, saved_state=None):
-		"""Initialze the Characteristic, perhaps from a saved state."""
+	def __init__(self, value=None, **argsd):
+		"""Initialze the Characteristic."""
 
-		super(Characteristic, self).__init__(name, id_, (), [Game.co_pass], is_root, saved_state)
+		try: del argsd["tree"]
+		except KeyError: pass
 
-		if saved_state:
+		super(Characteristic, self).__init__(tree=[], **argsd)
 
-			# Loading from a saved_state dict
-			self._value = saved_state["value"]
-
-		else:
-
-			self._value = value
+		self._value = value
 
 	def to_dict(self):
 		"""Create a JSON-serializable dict representation of the Characteristic."""
@@ -1884,14 +1823,14 @@ class Qualita(Characteristic):
 	"""
 	A qualitative Characteristic, with a bool or str value
 
-	Qualita.__init__(self, name="", id_="", value=True, is_root=False, saved_state=None)
+	Qualita.__init__(self, value=True, **argsd)
 	Qualita.to_dict(self)
 	"""
 
-	def __init__(self, name="", id_="", value=True, is_root=False, saved_state=None):
-		"""Initialze the Qualita, perhaps from a saved state."""
+	def __init__(self, value=True, **argsd):
+		"""Initialze the Qualita."""
 
-		super(Qualita, self).__init__(name, id_, value, is_root, saved_state)
+		super(Qualita, self).__init__(value=value, **argsd)
 
 	def to_dict(self):
 		"""Create a JSON-serializable dict representation of the Qualita."""
@@ -1913,7 +1852,7 @@ class Quanta(Characteristic):
 	Quanta.__floordiv__(self, other)
 	Quanta.__ge__(self, other)
 	Quanta.__gt__(self, other)
-	Quanta.__init__(self, name="", id_="", value=0, tree=(), method=[Game.co_pass], is_root=False, saved_state=None)
+	Quanta.__init__(self, value=0, **argsd)
 	Quanta.__int__(self)
 	Quanta.__le__(self, other)
 	Quanta.__lt__(self, other)
@@ -2004,10 +1943,10 @@ class Quanta(Characteristic):
 
 			return NotImplemented
 
-	def __init__(self, name="", id_="", value=0, is_root=False, saved_state=None):
-		"""Initialze the Quanta, perhaps from a saved state."""
+	def __init__(self, value=0, **argsd):
+		"""Initialze the Quanta."""
 
-		super(Quanta, self).__init__(name, id_, value, is_root, saved_state)
+		super(Quanta, self).__init__(value=value, **argsd)
 
 	def __int__(self):
 		"""Get an integer representation of the Quanta."""
@@ -2195,12 +2134,13 @@ class Action(Differentia):
 	A single action granted by a Figment
 
 	Action.__getattr__(self, attr)
-	Action.__init__(self, name="", id_="", tree=(), method=[Game.co_do_action], is_root=False, saved_state=None)
+	Action.__init__(self, qualita=[], quanta=[], **argsd)
 	Action.to_dict(self)
 
 	Action.qualita*
 	Action.quanta*
 	"""
+
 	def __getattr__(self, attr):
 		"""Get an attribute, but do a special behavior with characteristics."""
 
@@ -2216,17 +2156,16 @@ class Action(Differentia):
 
 			super(Action, self).__getattr__(attr)
 
-	def __init__(self, name="", id_="", qualita=[], quanta=[], meth_args=[[]], is_root=False, saved_state=None):
-		"""Initialze the Action, perhaps from a saved state."""
+	def __init__(self, qualita=None, quanta=None, **argsd):
+		"""
+		Initialze the Action.
 
-		super(Action, self).__init__(name, id_, [], [Game.co_pass], is_root, saved_state)
+		Both quanta and qualita need to be defined for it do override tree.
+		"""
 
-		if saved_state:
+		super(Action, self).__init__(**argsd)
 
-			# Loading from a saved_state dict
-			pass
-
-		else:
+		if qualita != None and quanta == None:
 
 			self._tree.append(Coagulate(name="Qualita",
 										tree=qualita,
@@ -2252,12 +2191,18 @@ def _path_from_id(id_):
 
 	return os.path.join(os.path.dirname(__file__), *id_.split(':'))
 
-def load_from_dict(saved_state, *args):
+def load_if_dict(saved_state, **argsd):
 	"""
 	Load an instance from a dict with the "_type" key.
 
-	Should this use copy.copy()?
-	Meanwhile while I'm not using copy.copy(), it's __init__'s job to not damage saved_state.
+	Because copy.copy is used, editing is fair game.
 	"""
 
-	return globals()[saved_state["_type"]](saved_state=saved_state, *args)
+	# Return in case we don't have JSON
+	if type(saved_state) != dict: return saved_state
+
+	ss_copy = copy.copy(saved_state)
+	type_ = ss_copy.pop("_type")
+	ss_copy.update(argsd)
+
+	return globals()[type_](**ss_copy)
