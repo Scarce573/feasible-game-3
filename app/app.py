@@ -540,7 +540,7 @@ class Game(object):
 		self._mod_index_push([VIEW_PAUSE, 0])
 
 	def _io_pmt_back(self):
-		"""Go back a prompt"""
+		"""Go back a prompt."""
 
 		self._prompt_back()
 
@@ -858,7 +858,7 @@ class Game(object):
 		will_do_turn = True
 
 		for mob in self._state.map.get_mobs():
-			if mob.next_turn == None:	# This uses "== None" because __nonzero__ isn't implemented for Action
+			if mob.next_turn is None:	# This uses "== None" because __nonzero__ isn't implemented for Action
 
 				will_do_turn = False
 
@@ -1055,12 +1055,12 @@ class Map(object):
 
 			fastest_mob = None
 			for mob in self.get_mobs():
-				if mob.next_turn == None:
+				if mob.next_turn is None:
 
 					# That mob has already moved
 					pass
 
-				elif fastest_mob == None:
+				elif fastest_mob is None:
 
 					# First one is automatically the fastest until deposed
 					fastest_mob = mob
@@ -1070,7 +1070,7 @@ class Map(object):
 
 					fastest_mob = mob
 
-			if fastest_mob == None:
+			if fastest_mob is None:
 
 				more_mobs = False
 
@@ -1665,7 +1665,7 @@ class Figment(Differentia):
 			self.quanta_inherited.append(quanta)
 		
 		# Override the data in tree
-		if qualita_inate != None and quanta_inate != None:
+		if qualita_inate is not None and quanta_inate is not None:
 
 			self._tree[0] = (Coagulate(	name="Qualita",
 										tree=qualita_inate,
@@ -2165,7 +2165,7 @@ class Action(Differentia):
 
 		super(Action, self).__init__(**argsd)
 
-		if qualita != None and quanta == None:
+		if qualita is not None and quanta is not None:
 
 			self._tree.append(Coagulate(name="Qualita",
 										tree=qualita,
