@@ -858,7 +858,7 @@ class Game(object):
 		will_do_turn = True
 
 		for mob in self._state.map.get_mobs():
-			if mob.next_turn is None:	# This uses "== None" because __nonzero__ isn't implemented for Action
+			if mob.next_turn == None:	# This uses "== None" because __nonzero__ isn't implemented for Action
 
 				will_do_turn = False
 
@@ -876,9 +876,9 @@ class State(object):
 	"""
 	The class which contains all the in-game information necessary to take a snapshot
 
-	State.__init__(self, map_, message_log, index_stack)
+	State.__init__(self, map_, index_stack, message_log=[])
 	State.__repr__(self)
-	State.__str__(self)f
+	State.__str__(self)
 	State.to_dict(self)
 
 	State.index_stack
@@ -945,9 +945,8 @@ class State(object):
 		# Construct state
 		state["_type"] = "State"
 		state["index_stack"] = saved_index_stack
-		state["map"] = self.map.to_dict()
+		state["map_"] = self.map.to_dict()
 		state["message_log"] = self.message_log
-		state["pause_coag"] = self.pause_coag.to_dict()
 
 		# Return state
 		return state
@@ -1055,12 +1054,12 @@ class Map(object):
 
 			fastest_mob = None
 			for mob in self.get_mobs():
-				if mob.next_turn is None:
+				if mob.next_turn == None:
 
 					# That mob has already moved
 					pass
 
-				elif fastest_mob is None:
+				elif fastest_mob == None:
 
 					# First one is automatically the fastest until deposed
 					fastest_mob = mob
@@ -1070,7 +1069,7 @@ class Map(object):
 
 					fastest_mob = mob
 
-			if fastest_mob is None:
+			if fastest_mob == None:
 
 				more_mobs = False
 
@@ -1102,12 +1101,14 @@ class Tile(object):
 
 			layer = {}
 
-			for key in saved_layer_dict:
+			for perm_str in saved_layer_dict:
+
+				permeability = int(perm_str)
 
 				entity_coords = copy.copy(coords)
-				entity_coords.append(int(key))
+				entity_coords.append(permeability)
 
-				layer[int(key)] = load_if_dict(saved_layer_dict[key], coords=entity_coords)
+				layer[permeability] = load_if_dict(saved_layer_dict[perm_str], coords=entity_coords)
 
 			self.layers.append(layer)
 
